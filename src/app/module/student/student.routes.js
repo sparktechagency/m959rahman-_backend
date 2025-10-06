@@ -29,7 +29,7 @@ router
   .patch(
     "/edit-profile",
     auth(config.auth_level.student),
-    uploadFile(),
+    uploadFile("profile_image" ),
     StudentController.updateProfile
   )
   .delete(

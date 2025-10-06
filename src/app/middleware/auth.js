@@ -37,7 +37,7 @@ const auth =
 
         // console.log(roles.length);
 
-        if (roles.length && !roles.includes(verifyUser.role))
+        if (roles?.length && !roles.includes(verifyUser.role))
           throw new ApiError(
             httpStatus.FORBIDDEN,
             "Access Forbidden: You do not have permission to perform this action"
