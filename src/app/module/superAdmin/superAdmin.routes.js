@@ -22,7 +22,10 @@ router
   .patch(
     "/edit-profile",
     auth(config.auth_level.super_admin),
-    uploadFile(),
+    uploadFile({
+      name: "profile_image",
+      maxCount: 1,  
+    }),
     SuperAdminController.updateProfile
   )
   .delete(
@@ -33,7 +36,10 @@ router
   .post(
     "/create-super-admin",
     auth(config.auth_level.super_admin),
-    uploadFile(),
+    uploadFile({
+      name: "profile_image",
+      maxCount: 1,
+    }),
     SuperAdminController.createSuperAdmin
   )
   .get(

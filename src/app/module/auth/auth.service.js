@@ -18,28 +18,30 @@ const Admin = require("../admin/Admin");
 
 
 const registrationAccount = async (payload) => {
-  const { role, name, password, confirmPassword, email } = payload;
+  const { role, firstname, lastname, password, confirmPassword, email } = payload;
 
   validateFields(payload, [
     "password",
     "confirmPassword",
     "email",
     "role",
-    "name",
+    "firstname",
+    "lastname",
   ]);
 
   const { code: activationCode, expiredAt: activationCodeExpire } =
     codeGenerator(3);
   const authData = {
     role,
-    name,
+    firstname,
+    lastname,
     email,
     password,
     activationCode,
     activationCodeExpire,
   };
   const data = {
-    user: name,
+    user: firstname + " " + lastname,
     activationCode,
     activationCodeExpire: Math.round(
       (activationCodeExpire - Date.now()) / (60 * 1000)
@@ -81,7 +83,8 @@ const registrationAccount = async (payload) => {
 
   const userData = {
     authId: auth._id,
-    name,
+    firstname,
+    lastname,
     email,
     phoneNumber: payload.phoneNumber,
   };
@@ -115,7 +118,7 @@ const resendActivationCode = async (payload) => {
   const { code: activationCode, expiredAt: activationCodeExpire } =
     codeGenerator(3);
   const data = {
-    user: user.name,
+    user: user.firstname + " " + user.lastname,
     code: activationCode,
     expiresIn: Math.round((activationCodeExpire - Date.now()) / (60 * 1000)),
   };

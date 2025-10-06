@@ -4,7 +4,8 @@ const AuthRoutes = require("../module/auth/auth.routes");
 const AdminRoutes = require("../module/admin/admin.routes");
 const SuperAdminRoutes = require("../module/superAdmin/superAdmin.routes");
 const UserRoutes = require("../module/user/user.routes");
-// const PhoneVerificationRoutes = require("../module/phoneVerification/phoneVerification.routes");
+const CurriculumRoutes = require("../module/curriculum/curriculum.routes");
+// const PhoneVerificationRoutes = require("../module/phoneVerification/phon  eVerification.routes");
 // const DashboardRoutes = require("../module/dashboard/dashboard.routes");
 const ManageRoutes = require("../module/manage/manage.routes");
 // const NotificationRoutes = require("../module/notification/notification.routes");
@@ -34,6 +35,10 @@ const moduleRoutes = [
   {
     path: "/manage",
     route: ManageRoutes,
+  },
+  {
+    path: "/curriculum",
+    route: CurriculumRoutes,
   },
   // {
   //   path: "/notification",

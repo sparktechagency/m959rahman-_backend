@@ -10,9 +10,11 @@ const StudentSchema = new Schema(
       required: true,
       ref: "Auth",
     },
-    name: {
+    firstname: {
       type: String,
-      required: true,
+    },
+    lastname: {
+      type: String,
     },
     email: {
       type: String,

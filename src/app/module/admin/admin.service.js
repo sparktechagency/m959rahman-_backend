@@ -11,13 +11,13 @@ const unlinkFile = require("../../../util/unlinkFile");
 const postAdmin = async (req) => {
   const { body: payload, files } = req;
 
-  validateFields(files, ["profile_image"]);
+  // validateFields(files, ["profile_image"]);
   validateFields(payload, [
     "name",
     "email",
     "password",
     "confirmPassword",
-    "phoneNumber",
+    // "phoneNumber",
   ]);
 
   if (payload.password !== payload.confirmPassword)
@@ -45,8 +45,8 @@ const postAdmin = async (req) => {
     email: payload.email,
     password: payload.password,
     role: EnumUserRole.ADMIN,
-    phoneNumber: payload.phoneNumber,
-    profile_image: files.profile_image[0].path,
+    phoneNumber: payload?.phoneNumber,
+    profile_image: files?.profile_image?.[0]?.path,
   };
 
   const admin = await Admin.create(adminData);
@@ -96,14 +96,21 @@ const getAllAdmins = async (userData, query) => {
 };
 
 const updateAdmin = async (req) => {
-  const { body: payload, files = {} } = req;
-  validateFields(payload, ["adminId"]);
+  const { body: payload, files = {}, user: userData } = req;
 
-  const admin = await Admin.findById(payload.adminId).lean();
-  if (!admin) throw new ApiError(status.NOT_FOUND, "Admin not found");
+  const { userId, authId } = userData;
+
+  // validateFields(payload, ["adminId"]);
+
+  const [auth, result] = await Promise.all([
+    Auth.findById(authId),
+    Admin.findById(userId).populate("authId"),
+  ]);
+
+  if (!result || !auth) throw new ApiError(status.NOT_FOUND, "Admin not found");
 
   if (files.profile_image)
-    if (admin.profile_image) unlinkFile(admin.profile_image);
+    if (result.profile_image) unlinkFile(result.profile_image);
 
   const updatedAData = {
     ...(payload.name && { name: payload.name }),
@@ -112,13 +119,13 @@ const updateAdmin = async (req) => {
   };
 
   const [updatedAdmin] = await Promise.all([
-    Admin.findByIdAndUpdate(payload.adminId, updatedAData, {
+    Admin.findByIdAndUpdate(userId, updatedAData, {
       new: true,
       runValidators: true,
     }).populate("authId"),
 
     Auth.findByIdAndUpdate(
-      admin.authId,
+      authId,
       {
         ...(payload.name && { name: payload.name }),
       },

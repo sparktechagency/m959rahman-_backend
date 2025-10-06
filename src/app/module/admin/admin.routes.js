@@ -10,7 +10,10 @@ router
   .post(
     "/post-admin",
     auth(config.auth_level.super_admin),
-    uploadFile(),
+    uploadFile({
+      name: "profile_image",
+      maxCount: 1,
+    }),
     AdminController.postAdmin
   )
   .get("/get-admin", auth(config.auth_level.user), AdminController.getAdmin)
@@ -21,8 +24,11 @@ router
   )
   .patch(
     "/update-admin",
-    auth(config.auth_level.super_admin),
-    uploadFile(),
+    auth(config.auth_level.admin),
+    uploadFile({
+      name: "profile_image",
+      maxCount: 1,
+    }),
     AdminController.updateAdmin
   )
   .patch(
@@ -43,7 +49,10 @@ router
   .patch(
     "/update-profile-image-admin",
     auth(config.auth_level.admin),
-    uploadFile(),
+    uploadFile({
+      name: "profile_image",
+      maxCount: 1,
+    }),
     AdminController.updateProfileImageAdmin
   )
   .patch(
