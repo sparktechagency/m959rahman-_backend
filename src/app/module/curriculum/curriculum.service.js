@@ -47,6 +47,23 @@ const getAllCurriculums = async (query) => {
     curriculumQuery.countTotal(),
   ]);
 
+  // Get topic counts using Promise.all for better performance
+  if (curriculums.length > 0) {
+    const topicCountPromises = curriculums.map(curriculum => 
+      Topic.countDocuments({ 
+        curriculumId: curriculum._id, 
+        isActive: true 
+      })
+    );
+
+    const topicCounts = await Promise.all(topicCountPromises);
+
+    // Add topicCount to each curriculum
+    curriculums.forEach((curriculum, index) => {
+      curriculum.topicCount = topicCounts[index];
+    });
+  }
+
   return {
     meta,
     curriculums,
@@ -197,7 +214,6 @@ const getTopicsByCurriculum = async (curriculumId, query) => {
   };
 };
 
-
 const getTopic = async (id) => {
   if (!mongoose.Types.ObjectId.isValid(id)) {
     throw new ApiError(status.BAD_REQUEST, "Invalid topic ID");
@@ -216,22 +232,77 @@ const getTopic = async (id) => {
 };
 
 
-const getAllTopics = async () => {
-  console.log('getAllTopics called');
-  try {
-    const topics = await Topic.find({ isActive: true })
-      .select('-curriculumId')
-      .populate('createdBy', 'name email')
-      .lean();
+// const getAllTopics = async (query) => {
+//   console.log("Query parameters received:", query);
+  
+//   const topicQuery = new QueryBuilder(
+//     Topic.find({ isActive: true })
+//       .populate("curriculumId", "name description")
+//       .populate("createdBy", "name email")
+//       .lean(),
+//     query
+//   )
+//     .search(["name", "description"])
+//     .filter()
+//     .sort()
+//     .paginate()
+//     .fields();
 
-    console.log('Successfully retrieved topics:', topics.length);
-    return topics;
+//   console.log("Final query:", topicQuery.modelQuery.getQuery());
+  
+//   const [topics, meta] = await Promise.all([
+//     topicQuery.modelQuery,
+//     topicQuery.countTotal(),
+//   ]);
+
+//   return {
+//     meta,
+//     topics,
+//   };
+// };
+
+const getAllTopics = async (query) => {
+  console.log('=== DEBUG getAllTopics ===');
+  console.log('Query params:', query);
+  
+  try {
+    // Test if QueryBuilder is the issue
+    const testQuery = new QueryBuilder(
+      Topic.find({ isActive: true }),
+      query
+    );
+    
+    console.log('QueryBuilder test passed');
+    
+    const topicQuery = new QueryBuilder(
+      Topic.find({ isActive: true })
+        .populate("curriculumId", "name description")
+        .populate("createdBy", "name email")
+        .lean(),
+      query
+    )
+      .search(["name", "description"])
+      .filter()
+      .sort()
+      .paginate()
+      .fields();
+
+    const [topics, meta] = await Promise.all([
+      topicQuery.modelQuery,
+      topicQuery.countTotal(),
+    ]);
+
+    console.log('Query executed successfully');
+    
+    return {
+      meta,
+      topics,
+    };
   } catch (error) {
-    console.error('Error in getAllTopics:', error);
-    throw new ApiError(500, 'Failed to fetch topics');
+    console.log('Error in QueryBuilder:', error.message);
+    throw error;
   }
 };
-
 
 
 const updateTopic = async (id, data) => {

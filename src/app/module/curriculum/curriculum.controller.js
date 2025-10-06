@@ -72,20 +72,13 @@ const getTopicsByCurriculum = catchAsync(async (req, res) => {
 });
 
 const getAllTopics = catchAsync(async (req, res) => {
-  console.log('getAllTopics controller called');
-  try {
-    const result = await CurriculumService.getAllTopics();
-    console.log('Sending response with', result.length, 'topics');
-    sendResponse(res, {
-      statusCode: 200,
-      success: true,
-      message: "Topics retrieved successfully",
-      data: result,
-    });
-  } catch (error) {
-    console.error('Error in getAllTopics controller:', error);
-    throw error; // Let the error handling middleware handle it
-  }
+  const result = await CurriculumService.getAllTopics(req.query);
+  sendResponse(res, {
+    statusCode: 200,
+    success: true,
+    message: "Topics retrieved successfully",
+    data: result,
+  });
 });
 
 const getTopic = catchAsync(async (req, res) => {

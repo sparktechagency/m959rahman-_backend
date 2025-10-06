@@ -6,6 +6,16 @@ const config = require("../../../config");
 
 const router = express.Router();
 
+
+
+router
+  .post("/topics", auth(config.auth_level.admin), CurriculumController.createTopic)
+  .get("/topics", auth(config.auth_level.admin), CurriculumController.getAllTopics) // NEW - Get all topics with pagination
+  .get("/topics/:curriculumId", auth(config.auth_level.admin), CurriculumController.getTopicsByCurriculum) // Existing - Get topics by curriculum
+  .patch("/topics/:id", auth(config.auth_level.admin), CurriculumController.updateTopic)
+  .delete("/topics/:id", auth(config.auth_level.admin), CurriculumController.deleteTopic);
+
+
 // Curriculum routes
 router.post("/", auth(config.auth_level.admin), CurriculumController.createCurriculum);
 router.get("/", auth(config.auth_level.admin), CurriculumController.getAllCurriculums);
@@ -14,12 +24,7 @@ router.patch("/:id", auth(config.auth_level.admin), CurriculumController.updateC
 router.delete("/:id", auth(config.auth_level.admin), CurriculumController.deleteCurriculum);
 
 // Topic routes - each on its own line to avoid chaining issues
-router.post("/topics", auth(config.auth_level.admin), CurriculumController.createTopic);
-router.get("/all-topics", auth(config.auth_level.admin), CurriculumController.getAllTopics);
-router.get("/topics/:curriculumId", auth(config.auth_level.admin), CurriculumController.getTopicsByCurriculum);
-router.get("/topic/:id", auth(config.auth_level.admin), CurriculumController.getTopic);
-router.patch("/topics/:id", auth(config.auth_level.admin), CurriculumController.updateTopic);
-router.delete("/topics/:id", auth(config.auth_level.admin), CurriculumController.deleteTopic);
+// Topic routes
 
 // Question routes
 router.post(
