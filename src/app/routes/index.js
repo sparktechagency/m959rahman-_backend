@@ -5,6 +5,7 @@ const AdminRoutes = require("../module/admin/admin.routes");
 const SuperAdminRoutes = require("../module/superAdmin/superAdmin.routes");
 const UserRoutes = require("../module/user/user.routes");
 const CurriculumRoutes = require("../module/curriculum/curriculum.routes");
+const StudentRoutes = require("../module/student/student.routes");
 // const PhoneVerificationRoutes = require("../module/phoneVerification/phon  eVerification.routes");
 // const DashboardRoutes = require("../module/dashboard/dashboard.routes");
 const ManageRoutes = require("../module/manage/manage.routes");
@@ -23,6 +24,10 @@ const moduleRoutes = [
   {
     path: "/user",
     route: UserRoutes,
+  },
+  {
+    path: "/student",
+    route: StudentRoutes,
   },
   {
     path: "/admin",

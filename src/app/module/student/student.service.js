@@ -5,6 +5,7 @@ const Auth = require("../auth/Auth");
 const unlinkFile = require("../../../util/unlinkFile");
 const validateFields = require("../../../util/validateFields");
 const QueryBuilder = require("../../../builder/queryBuilder");
+const mongoose = require("mongoose");
 
 const updateProfile = async (req) => {
   const { files, body: data } = req;
@@ -128,6 +129,56 @@ const updateBlockUnblockStudent = async (studentData, payload) => {
   return student;
 };
 
+// Get all students for admin with pagination and search
+const getAllStudentsForAdmin = async (query) => {
+  const studentQuery = new QueryBuilder(
+    Student.find()
+      .populate({
+        path: 'authId',
+        select: 'name email phoneNumber role isActive',
+      })
+      .select('-__v -createdAt -updatedAt')
+      .lean(),
+    query
+  )
+    .search(['name', 'email', 'studentId'])
+    .filter()
+    .sort()
+    .paginate()
+    .fields();
+
+  const [students, meta] = await Promise.all([
+    studentQuery.modelQuery,
+    studentQuery.countTotal(),
+  ]);
+
+  return {
+    meta,
+    students,
+  };
+};
+
+// Get single student details by ID for admin
+const getStudentDetailsForAdmin = async (studentId) => {
+  if (!mongoose.Types.ObjectId.isValid(studentId)) {
+    throw new ApiError(status.BAD_REQUEST, 'Invalid student ID');
+  }
+
+  const student = await Student.findById(studentId)
+    .populate({
+      path: 'authId',
+      select: 'name email phoneNumber role isActive',
+    })
+    .select('-__v -createdAt -updatedAt')
+    .lean();
+
+  if (!student) {
+    throw new ApiError(status.NOT_FOUND, 'Student not found');
+  }
+
+  return student;
+};
+
 const StudentService = {
   getProfile,
   deleteMyAccount,
@@ -135,6 +186,8 @@ const StudentService = {
   getStudent,
   getAllStudents,
   updateBlockUnblockStudent,
+  getAllStudentsForAdmin,
+  getStudentDetailsForAdmin,
 };
 
 module.exports = { StudentService };

@@ -6,6 +6,24 @@ const config = require("../../../config");
 
 const router = express.Router();
 
+
+
+// Admin routes for managing students
+router.get(
+  '/admin/students',
+  auth(config.auth_level.admin),
+  StudentController.getAllStudentsForAdmin
+);
+
+router.get(
+  '/admin/students/:id',
+  auth(config.auth_level.admin),
+  StudentController.getStudentDetailsForAdmin
+);
+
+
+
+
 router
   .get("/profile", auth(config.auth_level.student), StudentController.getProfile)
   .patch(

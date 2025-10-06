@@ -61,13 +61,39 @@ const getAllStudents = catchAsync(async (req, res) => {
   });
 });
 
+// Get all students for admin
+const getAllStudentsForAdmin = catchAsync(async (req, res) => {
+  const result = await StudentService.getAllStudentsForAdmin(req.query);
+  sendResponse(res, {
+    statusCode: 200,
+    success: true,
+    message: 'Students retrieved successfully',
+    data: result.students,
+    meta: result.meta,
+  });
+});
+
+// Get single student details for admin
+const getStudentDetailsForAdmin = catchAsync(async (req, res) => {
+  const { id } = req.params;
+  const result = await StudentService.getStudentDetailsForAdmin(id);
+  sendResponse(res, {
+    statusCode: 200,
+    success: true,
+    message: 'Student details retrieved successfully',
+    data: result,
+  });
+});
+
 const StudentController = {
-  deleteMyAccount,
-  getProfile,
   updateProfile,
+  getProfile,
+  deleteMyAccount,
   getStudent,
   updateBlockUnblockStudent,
   getAllStudents,
+  getAllStudentsForAdmin,
+  getStudentDetailsForAdmin,
 };
 
 module.exports = { StudentController };
