@@ -6,6 +6,7 @@ const SuperAdminRoutes = require("../module/superAdmin/superAdmin.routes");
 const UserRoutes = require("../module/user/user.routes");
 const CurriculumRoutes = require("../module/curriculum/curriculum.routes");
 const StudentRoutes = require("../module/student/student.routes");
+const TeacherRoutes = require("../module/teacher/teacher.routes");
 // const PhoneVerificationRoutes = require("../module/phoneVerification/phon  eVerification.routes");
 // const DashboardRoutes = require("../module/dashboard/dashboard.routes");
 const ManageRoutes = require("../module/manage/manage.routes");
@@ -44,6 +45,10 @@ const moduleRoutes = [
   {
     path: "/curriculum",
     route: CurriculumRoutes,
+  },
+  {
+    path: "/teacher",
+    route: TeacherRoutes,
   },
   // {
   //   path: "/notification",

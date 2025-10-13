@@ -33,7 +33,7 @@ router
   )
   .patch(
     "/update-admin-password",
-    auth(config.auth_level.super_admin),
+    auth(config.auth_level.admin),
     AdminController.updateAdminPassword
   )
   .delete(

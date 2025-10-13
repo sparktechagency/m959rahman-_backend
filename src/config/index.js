@@ -20,9 +20,10 @@ const config = {
   base_url: process.env.BASE_URL,
   database_url: process.env.MONGO_URL,
   auth_level: {
-    user: ["STUDENT", "SCHOOL", "TEACHER"],
-    admin: ["ADMIN", "SUPER_ADMIN"],
-    super_admin: ["SUPER_ADMIN"],
+    user: ["STUDENT", "TEACHER", "ADMIN", "SUPER_ADMIN"], // All authenticated users
+    teacher: ["TEACHER", "ADMIN", "SUPER_ADMIN"], // Teacher and above
+    admin: ["ADMIN", "SUPER_ADMIN"], // Admin and super admin
+    super_admin: ["SUPER_ADMIN"], // Super admin only
   },
   jwt: {
     secret: process.env.JWT_SECRET,

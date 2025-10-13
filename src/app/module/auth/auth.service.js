@@ -14,6 +14,7 @@ const SuperAdmin = require("../superAdmin/SuperAdmin");
 const validateFields = require("../../../util/validateFields");
 const EmailHelpers = require("../../../util/emailHelpers");
 const Admin = require("../admin/Admin");
+const Teacher = require("../teacher/Teacher")
 
 
 
@@ -79,6 +80,9 @@ const registrationAccount = async (payload) => {
   if (role === EnumUserRole.STUDENT)
     EmailHelpers.sendActivationEmail(email, data);
 
+  if (role === EnumUserRole.TEACHER)
+    EmailHelpers.sendActivationEmail(email, data);
+
   const auth = await Auth.create(authData);
 
   const userData = {
@@ -98,6 +102,9 @@ const registrationAccount = async (payload) => {
       break;
     case EnumUserRole.STUDENT:
       await Student.create(userData);
+      break;  
+    case EnumUserRole.TEACHER:
+      await Teacher.create(userData);
       break;
     default:
       throw new ApiError(status.BAD_REQUEST, "Invalid role. But auth created");
@@ -164,13 +171,17 @@ const activateAccount = async (payload) => {
     case EnumUserRole.STUDENT:
       result = await Student.findOne({ authId: auth._id }).lean();
       break;
+    case EnumUserRole.TEACHER:
+      result = await Teacher.findOne({ authId: auth._id }).lean();
+      console.log(result)
+      break;
     default:
       result = await Auth.findOne({ authId: auth._id }).lean();
   }
 
   const tokenPayload = {
     authId: auth._id,
-    userId: result._id,
+    userId: result._id ,
     email,
     role: auth.role,
   };
@@ -227,6 +238,11 @@ const loginAccount = async (payload) => {
       break;
     case EnumUserRole.STUDENT:
       result = await Student.findOne({ authId: auth._id })
+        .populate("authId")
+        .lean();
+      break;
+    case EnumUserRole.TEACHER:
+      result = await Teacher.findOne({ authId: auth._id })
         .populate("authId")
         .lean();
       break;

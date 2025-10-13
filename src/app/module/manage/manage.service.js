@@ -110,12 +110,12 @@ const deleteAboutUs = async (query) => {
 };
 
 const addFaq = async (payload) => {
-  validateFields(payload, ["question", "description"]);
+  validateFields(payload, ["question", "description", "role"]);
   return await FAQ.create(payload);
 };
 
 const updateFaq = async (payload) => {
-  validateFields(payload, ["faqId", "question", "description"]);
+  validateFields(payload, ["faqId", "question", "description", "role"]);
 
   const { faqId, ...rest } = payload;
 
@@ -129,8 +129,9 @@ const updateFaq = async (payload) => {
   return result;
 };
 
-const getFaq = async () => {
-  return await FAQ.find({});
+const getFaq = async (query) => {
+  validateFields(query, ["role"]);
+  return await FAQ.find({ role: query.role });
 };
 
 const deleteFaq = async (query) => {

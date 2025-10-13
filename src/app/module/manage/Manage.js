@@ -35,6 +35,11 @@ const faqSchema = new mongoose.Schema(
       type: String,
       required: true,
     },
+    role: {
+      type: String,
+      enum: ["STUDENT", "TEACHER", "SCHOOL"],
+      required: true,
+    }
   },
   {
     timestamps: true,
@@ -55,10 +60,23 @@ const aboutUsSchema = new mongoose.Schema(
 
 const contactUsSchema = new mongoose.Schema(
   {
-    description: {
+    email: {
       type: String,
       required: true,
     },
+    phone: {
+      type: String,
+      required: true,
+    },
+    facebookLink: {
+      type: String
+    },
+    linkedinLink: {
+      type: String
+    },
+    instagramLink: {
+      type: String
+    }
   },
   {
     timestamps: true,

@@ -113,7 +113,7 @@ const updateFaq = catchAsync(async (req, res) => {
 });
 
 const getFaq = catchAsync(async (req, res) => {
-  const result = await ManageService.getFaq();
+  const result = await ManageService.getFaq(req.query);
   sendResponse(res, {
     statusCode: 200,
     success: true,
