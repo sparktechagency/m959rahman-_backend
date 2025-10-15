@@ -162,6 +162,59 @@ const deleteContactUs = catchAsync(async (req, res) => {
   });
 });
 
+const addSupport = catchAsync(async (req, res) => {
+  const result = await ManageService.addSupport({
+    ...req.body
+  });
+  sendResponse(res, {
+    statusCode: 201,
+    success: true,
+    message: "Support request created successfully",
+    data: result,
+  });
+});
+
+const getSupport = catchAsync(async (req, res) => {
+  const result = await ManageService.getSupport(req.query);
+  sendResponse(res, {
+    statusCode: 200,
+    success: true,
+    message: "Support requests retrieved successfully",
+    data: result.supports,
+    meta: result.meta,
+  });
+});
+
+const getSupportById = catchAsync(async (req, res) => {
+  const result = await ManageService.getSupportById(req.params.id);
+  sendResponse(res, {
+    statusCode: 200,
+    success: true,
+    message: "Support request retrieved successfully",
+    data: result,
+  });
+});
+
+const updateSupportStatus = catchAsync(async (req, res) => {
+  const result = await ManageService.updateSupportStatus(req.params.id, req.body);
+  sendResponse(res, {
+    statusCode: 200,
+    success: true,
+    message: "Support status updated successfully",
+    data: result,
+  });
+});
+
+const deleteSupport = catchAsync(async (req, res) => {
+  const result = await ManageService.deleteSupport(req.params.id);
+  sendResponse(res, {
+    statusCode: 200,
+    success: true,
+    message: "Support request deleted successfully",
+    data: result,
+  });
+});
+
 const ManageController = {
   addPrivacyPolicy,
   getPrivacyPolicy,
@@ -179,6 +232,11 @@ const ManageController = {
   addContactUs,
   getContactUs,
   deleteContactUs,
+  addSupport,
+  getSupport,
+  getSupportById,
+  updateSupportStatus,
+  deleteSupport,
 };
 
-module.exports = ManageController;
+module.exports =  ManageController ;

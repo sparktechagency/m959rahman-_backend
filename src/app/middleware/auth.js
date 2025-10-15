@@ -24,6 +24,7 @@ const auth =
         const token = tokenWithBearer.split(" ")[1];
 
         const verifyUser = jwtHelpers.verifyToken(token, config.jwt.secret);
+        console.log("verifyUser", verifyUser);
 
         // Verify user exists and is active
         const isExist = await Auth.findById(verifyUser?.authId);
@@ -61,7 +62,8 @@ const auth =
         }
 
         req.user = verifyUser;
-
+        console.log("req.user", req.user);
+        console.log("roles", roles);
         // Role-based access control
         if (roles?.length && !roles.includes(verifyUser.role)) {
           throw new ApiError(

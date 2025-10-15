@@ -61,6 +61,13 @@ router
     "/delete-contact-us",
     auth(config.auth_level.admin),
     ManageController.deleteContactUs
-  );
+  )
+
+  // Support routes - both admin and users can create and view
+  .post("/support", ManageController.addSupport)
+  .get("/support", auth(config.auth_level.admin), ManageController.getSupport)
+  .get("/support/:id", auth(config.auth_level.admin), ManageController.getSupportById)
+  .patch("/support/:id/status", auth(config.auth_level.admin), ManageController.updateSupportStatus)
+  .delete("/support/:id", auth(config.auth_level.admin), ManageController.deleteSupport);
 
 module.exports = router;

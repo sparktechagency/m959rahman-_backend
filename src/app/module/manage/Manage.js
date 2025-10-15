@@ -83,10 +83,34 @@ const contactUsSchema = new mongoose.Schema(
   }
 );
 
+const supportSchema = new mongoose.Schema(
+  {
+    subject: {
+      type: String,
+      default: ""
+    },
+    opinion: {
+      type: String,
+      default: ""
+    },
+    status: {
+      type: String,
+      enum: ["PENDING", "COMPLETED"],
+      default: "PENDING"
+    }
+  },
+  {
+    timestamps: true,
+  }
+)
+
+
+
 module.exports = {
   PrivacyPolicy: model("PrivacyPolicy", privacySchema),
   TermsConditions: model("TermsConditions", termsAndConditionsSchema),
   FAQ: model("FAQ", faqSchema),
   AboutUs: model("AboutUs", aboutUsSchema),
   ContactUs: model("ContactUs", contactUsSchema),
+  Support: model("Support", supportSchema),
 };

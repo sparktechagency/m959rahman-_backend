@@ -5,9 +5,12 @@ const {
   AboutUs,
   FAQ,
   ContactUs,
+  Support,
 } = require("./Manage");
 const ApiError = require("../../../error/ApiError");
 const validateFields = require("../../../util/validateFields");
+const QueryBuilder = require("../../../builder/queryBuilder");
+const mongoose = require("mongoose");
 
 const addTermsConditions = async (payload) => {
   const checkIsExist = await TermsConditions.findOne();
@@ -179,6 +182,89 @@ const deleteContactUs = async (query) => {
   return result;
 };
 
+const addSupport = async (payload) => {
+  validateFields(payload, ["subject", "opinion"]);
+  return await Support.create(payload);
+};
+
+const getSupport = async (query) => {
+  const supportQuery = new QueryBuilder(
+    Support.find({})
+      .lean(),
+    query
+  )
+    .search(["subject", "opinion"])
+    .filter()
+    .sort()
+    .paginate()
+    .fields();
+
+  const [supports, meta] = await Promise.all([
+    supportQuery.modelQuery,
+    supportQuery.countTotal(),
+  ]);
+
+  return {
+    meta,
+    supports,
+  };
+};
+
+const getSupportById = async (id) => {
+  if (!mongoose.Types.ObjectId.isValid(id)) {
+    throw new ApiError(status.BAD_REQUEST, "Invalid support ID");
+  }
+
+  const support = await Support.findById(id)
+    .lean();
+
+  if (!support) {
+    throw new ApiError(status.NOT_FOUND, "Support request not found");
+  }
+
+  return support;
+};
+
+const updateSupportStatus = async (id, payload) => {
+  validateFields(payload, ["status"]);
+
+  if (!mongoose.Types.ObjectId.isValid(id)) {
+    throw new ApiError(status.BAD_REQUEST, "Invalid support ID");
+  }
+
+  const validStatuses = ["PENDING", "COMPLETED"];
+  if (!validStatuses.includes(payload.status)) {
+    throw new ApiError(status.BAD_REQUEST, "Invalid status. Must be PENDING or COMPLETED");
+  }
+
+  const support = await Support.findByIdAndUpdate(
+    id,
+    { status: payload.status },
+    { new: true, runValidators: true }
+  )
+    .lean();
+
+  if (!support) {
+    throw new ApiError(status.NOT_FOUND, "Support request not found");
+  }
+
+  return support;
+};
+
+const deleteSupport = async (id) => {
+  if (!mongoose.Types.ObjectId.isValid(id)) {
+    throw new ApiError(status.BAD_REQUEST, "Invalid support ID");
+  }
+
+  const result = await Support.deleteOne({ _id: id });
+
+  if (!result.deletedCount) {
+    throw new ApiError(status.NOT_FOUND, "Support request not found");
+  }
+
+  return result;
+};
+
 const ManageService = {
   addPrivacyPolicy,
   getPrivacyPolicy,
@@ -196,6 +282,11 @@ const ManageService = {
   addContactUs,
   getContactUs,
   deleteContactUs,
+  addSupport,
+  getSupport,
+  getSupportById,
+  updateSupportStatus,
+  deleteSupport,
 };
 
 module.exports = ManageService;
