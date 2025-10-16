@@ -62,8 +62,6 @@ const auth =
         }
 
         req.user = verifyUser;
-        console.log("req.user", req.user);
-        console.log("roles", roles);
         // Role-based access control
         if (roles?.length && !roles.includes(verifyUser.role)) {
           throw new ApiError(
