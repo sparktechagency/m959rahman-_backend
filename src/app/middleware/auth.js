@@ -24,7 +24,6 @@ const auth =
         const token = tokenWithBearer.split(" ")[1];
 
         const verifyUser = jwtHelpers.verifyToken(token, config.jwt.secret);
-        console.log("verifyUser", verifyUser);
 
         // Verify user exists and is active
         const isExist = await Auth.findById(verifyUser?.authId);
