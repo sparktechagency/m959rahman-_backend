@@ -102,7 +102,7 @@ const removeAssignmentFromClass = catchAsync(async (req, res) => {
 });
 
 const getClassAssignments = catchAsync(async (req, res) => {
-    const result = await ClassService.getClassAssignments(req.params.id);
+    const result = await ClassService.getClassAssignments(req.params.classId);
     sendResponse(res, {
         statusCode: 200,
         success: true,
@@ -183,7 +183,7 @@ const deleteAssignment = catchAsync(async (req, res) => {
 });
 
 const addQuestionsToAssignment = catchAsync(async (req, res) => {
-    const result = await ClassService.addQuestionsToAssignment(req.params.id, req.body);
+    const result = await ClassService.addQuestionsToAssignment(req.params.assignmentId, req.body);
     sendResponse(res, {
         statusCode: 200,
         success: true,

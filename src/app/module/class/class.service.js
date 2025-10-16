@@ -427,7 +427,7 @@ const getClassAssignments = async (classId) => {
                     {
                         $match: {
                             assignmentId: assignment.assignmentId._id,
-                            classId: mongoose.Types.ObjectId(classId),
+                            classId: classId,
                             status: { $ne: "inactive" }
                         }
                     },
