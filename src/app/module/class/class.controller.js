@@ -1,4 +1,4 @@
-const { ClassService } = require("./class.service");
+const ClassService = require("./class.service");
 const sendResponse = require("../../../util/sendResponse");
 const catchAsync = require("../../../util/catchAsync");
 
@@ -124,7 +124,7 @@ const getAssignmentDetails = catchAsync(async (req, res) => {
 
 // ------------------------------------------------------------------
 const createAssignment = catchAsync(async (req, res) => {
-    const result = await AssignmentService.createAssignment(req);
+    const result = await ClassService.createAssignment(req);
     sendResponse(res, {
         statusCode: 201,
         success: true,
@@ -134,7 +134,7 @@ const createAssignment = catchAsync(async (req, res) => {
 });
 
 const getQuestionsByCurriculumAndTopic = catchAsync(async (req, res) => {
-    const result = await AssignmentService.getQuestionsByCurriculumAndTopic(req.query);
+    const result = await ClassService.getQuestionsByCurriculumAndTopic(req.query);
     sendResponse(res, {
         statusCode: 200,
         success: true,
@@ -144,7 +144,7 @@ const getQuestionsByCurriculumAndTopic = catchAsync(async (req, res) => {
 });
 
 const getAssignmentById = catchAsync(async (req, res) => {
-    const result = await AssignmentService.getAssignmentById(req.params.id);
+    const result = await ClassService.getAssignmentById(req.params.id);
     sendResponse(res, {
         statusCode: 200,
         success: true,
@@ -154,7 +154,7 @@ const getAssignmentById = catchAsync(async (req, res) => {
 });
 
 const getMyAssignments = catchAsync(async (req, res) => {
-    const result = await AssignmentService.getMyAssignments(req.user, req.query);
+    const result = await ClassService.getMyAssignments(req.user, req.query);
     sendResponse(res, {
         statusCode: 200,
         success: true,
@@ -164,7 +164,7 @@ const getMyAssignments = catchAsync(async (req, res) => {
 });
 
 const updateAssignment = catchAsync(async (req, res) => {
-    const result = await AssignmentService.updateAssignment(req.params.id, req.body);
+    const result = await ClassService.updateAssignment(req.params.id, req.body);
     sendResponse(res, {
         statusCode: 200,
         success: true,
@@ -174,7 +174,7 @@ const updateAssignment = catchAsync(async (req, res) => {
 });
 
 const deleteAssignment = catchAsync(async (req, res) => {
-    await AssignmentService.deleteAssignment(req.params.id);
+    await ClassService.deleteAssignment(req.params.id);
     sendResponse(res, {
         statusCode: 200,
         success: true,
@@ -183,7 +183,7 @@ const deleteAssignment = catchAsync(async (req, res) => {
 });
 
 const addQuestionsToAssignment = catchAsync(async (req, res) => {
-    const result = await AssignmentService.addQuestionsToAssignment(req.params.id, req.body);
+    const result = await ClassService.addQuestionsToAssignment(req.params.id, req.body);
     sendResponse(res, {
         statusCode: 200,
         success: true,
@@ -193,7 +193,7 @@ const addQuestionsToAssignment = catchAsync(async (req, res) => {
 });
 
 const removeQuestionsFromAssignment = catchAsync(async (req, res) => {
-    const result = await AssignmentService.removeQuestionsFromAssignment(req.params.id, req.body);
+    const result = await ClassService.removeQuestionsFromAssignment(req.params.id, req.body);
     sendResponse(res, {
         statusCode: 200,
         success: true,
