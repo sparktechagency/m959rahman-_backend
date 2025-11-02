@@ -9,9 +9,9 @@ const StudentRoutes = require("../module/student/student.routes");
 const TeacherRoutes = require("../module/teacher/teacher.routes");
 // const PhoneVerificationRoutes = require("../module/phoneVerification/phon  eVerification.routes");
 // const DashboardRoutes = require("../module/dashboard/dashboard.routes");
+const NotificationRoutes = require("../module/notification/notification.routes");
 const ManageRoutes = require("../module/manage/manage.routes");
 const ClassRoutes = require("../module/class/class.routes");
-// const NotificationRoutes = require("../module/notification/notification.routes");
 // const FeedbackRoutes = require("../module/feedback/feedback.routes");
 // const ReviewRoutes = require("../module/review/review.routes");
 // const PostRoutes = require("../module/post/post.routes");
@@ -55,10 +55,10 @@ const moduleRoutes = [
     path: "/class",
     route: ClassRoutes,
   },
-  // {
-  //   path: "/notification",
-  //   route: NotificationRoutes,
-  // },
+  {
+    path: "/notification",
+    route: NotificationRoutes,
+  },
   // {
   //   path: "/feedback",
   //   route: FeedbackRoutes,
