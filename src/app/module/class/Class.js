@@ -10,7 +10,6 @@ const ClassSchema = new Schema(
     },
     classCode: {
       type: String,
-      unique: true,
     },
     teacherId: {
       type: Schema.Types.ObjectId,
@@ -20,7 +19,7 @@ const ClassSchema = new Schema(
     students: [{
       studentId: {
         type: Schema.Types.ObjectId,
-        ref: "Auth",
+        ref: "Student"
       },
       joinedAt: {
         type: Date,

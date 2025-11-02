@@ -82,7 +82,7 @@ const getStudentsInClass = catchAsync(async (req, res) => {
 });
 
 const addAssignmentToClass = catchAsync(async (req, res) => {
-    const result = await ClassService.addAssignmentToClass(req.params.id, req.body);
+    const result = await ClassService.addAssignmentToClass(req.params.classId, req.body);
     sendResponse(res, {
         statusCode: 200,
         success: true,
@@ -92,7 +92,7 @@ const addAssignmentToClass = catchAsync(async (req, res) => {
 });
 
 const removeAssignmentFromClass = catchAsync(async (req, res) => {
-    const result = await ClassService.removeAssignmentFromClass(req.params.id, req.body);
+    const result = await ClassService.removeAssignmentFromClass(req.params.classId, req.body);
     sendResponse(res, {
         statusCode: 200,
         success: true,
@@ -117,6 +117,17 @@ const getAssignmentDetails = catchAsync(async (req, res) => {
         statusCode: 200,
         success: true,
         message: "Assignment details retrieved successfully",
+        data: result,
+    });
+});
+
+
+const getAllAssignmentsByTeacherId = catchAsync(async (req, res) => {
+    const result = await ClassService.getAllAssignmentsByTeacherId(req.user.authId);
+    sendResponse(res, {
+        statusCode: 200,
+        success: true,
+        message: "Assignments retrieved successfully",
         data: result,
     });
 });
@@ -193,7 +204,7 @@ const addQuestionsToAssignment = catchAsync(async (req, res) => {
 });
 
 const removeQuestionsFromAssignment = catchAsync(async (req, res) => {
-    const result = await ClassService.removeQuestionsFromAssignment(req.params.id, req.body);
+    const result = await ClassService.removeQuestionsFromAssignment(req.params.assignmentId, req.body);
     sendResponse(res, {
         statusCode: 200,
         success: true,
@@ -216,6 +227,7 @@ const ClassController = {
     removeAssignmentFromClass,
     getClassAssignments,
     getAssignmentDetails,
+    getAllAssignmentsByTeacherId,
     //   ------------------------------
     createAssignment,
     getQuestionsByCurriculumAndTopic,

@@ -7,6 +7,7 @@ const Teacher = require("../teacher/Teacher");
 const Auth = require("../auth/Auth");
 const validateFields = require("../../../util/validateFields");
 const unlinkFile = require("../../../util/unlinkFile");
+const QueryBuilder = require("../../../builder/queryBuilder");
 
 const getProfile = async (userData) => {
   const { userId, authId } = userData;
@@ -201,6 +202,99 @@ const getSubscriptionPlans = async () => {
   return plans;
 };
 
+const getAllTeachers = async (query) => {
+  const teacherQuery = new QueryBuilder(
+    Teacher.find({})
+      .populate("authId", "email isVerified isBlocked isActive")
+      .lean(),
+    query
+  )
+    .search(["firstname", "lastname", "email", "specialization"])
+    .sort()
+    .paginate();
+
+  const [teachers, meta] = await Promise.all([
+    teacherQuery.modelQuery,
+    teacherQuery.countTotal(),
+  ]);
+
+  // Add full name and format the response (summary view for list)
+  const formattedTeachers = teachers.map(teacher => ({
+    _id: teacher._id,
+    firstName: teacher.firstname,
+    lastName: teacher.lastname,
+    fullName: `${teacher.firstname} ${teacher.lastname}`,
+    email: teacher.email,
+    profile_image: teacher.profile_image,
+    specialization: teacher.specialization,
+    experience: teacher.experience,
+    subscription: {
+      plan: teacher.subscription?.plan,
+      status: teacher.subscription?.status,
+    },
+    auth: {
+      isVerified: teacher.authId?.isVerified,
+      isBlocked: teacher.authId?.isBlocked,
+      isActive: teacher.authId?.isActive,
+    },
+    createdAt: teacher.createdAt,
+  }));
+
+  return {
+    meta,
+    teachers: formattedTeachers,
+  };
+};
+
+const getTeacherById = async (id) => {
+  if (!mongoose.Types.ObjectId.isValid(id)) {
+    throw new ApiError(status.BAD_REQUEST, "Invalid teacher ID");
+  }
+
+  const teacher = await Teacher.findById(id)
+    .populate("authId", "email isVerified isBlocked isActive createdAt updatedAt")
+    .lean();
+
+  if (!teacher) {
+    throw new ApiError(status.NOT_FOUND, "Teacher not found");
+  }
+
+  // Format the response
+  const formattedTeacher = {
+    _id: teacher._id,
+    firstName: teacher.firstname,
+    lastName: teacher.lastname,
+    fullName: `${teacher.firstname} ${teacher.lastname}`,
+    email: teacher.email,
+    profile_image: teacher.profile_image,
+    phoneNumber: teacher.phoneNumber,
+    dateOfBirth: teacher.dateOfBirth,
+    address: teacher.address,
+    bio: teacher.bio,
+    specialization: teacher.specialization,
+    experience: teacher.experience,
+    qualifications: teacher.qualifications,
+    subscription: teacher.subscription,
+    auth: {
+      _id: teacher.authId?._id,
+      email: teacher.authId?.email,
+      isVerified: teacher.authId?.isVerified,
+      isBlocked: teacher.authId?.isBlocked,
+      isActive: teacher.authId?.isActive,
+      createdAt: teacher.authId?.createdAt,
+      updatedAt: teacher.authId?.updatedAt,
+    },
+    createdAt: teacher.createdAt,
+    updatedAt: teacher.updatedAt,
+  };
+
+  return formattedTeacher;
+};
+
+
+
+
+
 const TeacherService = {
   getProfile,
   updateProfile,
@@ -209,6 +303,8 @@ const TeacherService = {
   cancelSubscription,
   renewSubscription,
   getSubscriptionPlans,
+  getAllTeachers,
+  getTeacherById,
 };
 
 module.exports = { TeacherService };

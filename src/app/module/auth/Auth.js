@@ -7,7 +7,10 @@ const { Schema, model } = mongoose;
 
 const AuthSchema = new Schema(
   {
-    name: {
+    firstName: {
+      type: String,
+    },
+    lastName: {
       type: String,
     },
     email: {

@@ -87,8 +87,8 @@ const registrationAccount = async (payload) => {
 
   const userData = {
     authId: auth._id,
-    firstname,
-    lastname,
+    firstName: firstname,
+    lastName: lastname,
     email,
     phoneNumber: payload.phoneNumber,
   };

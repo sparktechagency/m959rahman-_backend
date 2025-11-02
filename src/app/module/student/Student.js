@@ -10,10 +10,10 @@ const StudentSchema = new Schema(
       required: true,
       ref: "Auth",
     },
-    firstname: {
+    firstName: {
       type: String,
     },
-    lastname: {
+    lastName: {
       type: String,
     },
     email: {
@@ -22,6 +22,7 @@ const StudentSchema = new Schema(
     },
     profile_image: {
       type: String,
+      default: null,
     },
     phoneNumber: {
       type: String,

@@ -9,6 +9,9 @@ const router = express.Router();
 router
     .post("/", auth(config.auth_level.teacher), ClassController.createClass)
     .get("/my-classes", auth(config.auth_level.teacher), ClassController.getMyClasses)
+
+// Class specific routes
+router
     .get("/:id", auth(config.auth_level.teacher), ClassController.getClassById)
     .patch("/:id", auth(config.auth_level.teacher), ClassController.updateClass)
     .delete("/:id", auth(config.auth_level.teacher), ClassController.deleteClass)
@@ -18,16 +21,18 @@ router
 
 // Assignment routes within class
 router
-    .post("/:classId/assignments", auth(config.auth_level.teacher), ClassController.createAssignment)
+    .post("/assignments", auth(config.auth_level.teacher), ClassController.createAssignment)
     .get("/:classId/assignments", auth(config.auth_level.teacher), ClassController.getClassAssignments)
     .get("/:classId/assignments/:assignmentId", auth(config.auth_level.teacher), ClassController.getAssignmentDetails)
     .delete("/:classId/assignments", auth(config.auth_level.teacher), ClassController.removeAssignmentFromClass)
-    .post("/:classId/assignments/:assignmentId/questions", auth(config.auth_level.teacher), ClassController.addQuestionsToAssignment)
-    .delete("/:classId/assignments/:assignmentId/questions", auth(config.auth_level.teacher), ClassController.removeQuestionsFromAssignment);
+    
+    .post("/:classId/assignments", auth(config.auth_level.teacher), ClassController.addAssignmentToClass);
 
 // General assignment routes (for teacher's all assignments)
 router
+    .post("/assignments/:assignmentId/questions", auth(config.auth_level.teacher), ClassController.addQuestionsToAssignment)
     .get("/assignments/questions", auth(config.auth_level.teacher), ClassController.getQuestionsByCurriculumAndTopic)
+    .delete("/assignments/:assignmentId/questions", auth(config.auth_level.teacher), ClassController.removeQuestionsFromAssignment)    
     .get("/assignments/my-assignments", auth(config.auth_level.teacher), ClassController.getMyAssignments)
     .get("/assignments/:id", auth(config.auth_level.teacher), ClassController.getAssignmentById)
     .patch("/assignments/:id", auth(config.auth_level.teacher), ClassController.updateAssignment)

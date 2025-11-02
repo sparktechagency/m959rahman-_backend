@@ -5,7 +5,7 @@ const StudentAssignmentSchema = new Schema(
   {
     studentId: {
       type: Schema.Types.ObjectId,
-      ref: "Auth",
+      ref: "Student",
       required: true,
     },
     assignmentId: {

@@ -11,10 +11,6 @@ const AssignmentSchema = new Schema(
       type: Date,
       default: Date.now,
     },
-    assignmentCode: {
-      type: String,
-      unique: true,
-    },
     description: {
       type: String,
       trim: true,
@@ -24,28 +20,24 @@ const AssignmentSchema = new Schema(
       ref: "Auth",
       required: true,
     },
-    curriculumId: {
-      type: Schema.Types.ObjectId,
-      ref: "Curriculum",
-      required: true,
-    },
-    topicId: {
-      type: Schema.Types.ObjectId,
-      ref: "Topic",
-      required: true,
-    },
     questions: [{
       type: Schema.Types.ObjectId,
       ref: "Question",
     }],
-    classId: {
+    classId: [{
       type: Schema.Types.ObjectId,
-      ref: "Class",
-      required: true,
+      ref: "Class"
+    }],
+    curriculumId: {
+      type: Schema.Types.ObjectId,
+      ref: "Curriculum"
+    },
+    topicId: {
+      type: Schema.Types.ObjectId,
+      ref: "Topic"
     },
     totalMarks: {
       type: Number,
-      required: true,
     },
     duration: {
       type: Number, // in minutes
@@ -59,15 +51,6 @@ const AssignmentSchema = new Schema(
     timestamps: true,
   }
 );
-
-// Pre-save to generate assignment code
-AssignmentSchema.pre('save', async function(next) {
-  if (this.isNew) {
-    const count = await mongoose.model('Assignment').countDocuments();
-    this.assignmentCode = `AS1-TA${count + 1}`;
-  }
-  next();
-});
 
 const Assignment = model("Assignment", AssignmentSchema);
 

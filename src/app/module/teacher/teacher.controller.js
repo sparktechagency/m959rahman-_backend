@@ -72,6 +72,26 @@ const getSubscriptionPlans = catchAsync(async (req, res) => {
   });
 });
 
+const getAllTeachers = catchAsync(async (req, res) => {
+  const result = await TeacherService.getAllTeachers(req.query);
+  sendResponse(res, {
+    statusCode: 200,
+    success: true,
+    message: "Teachers retrieved successfully",
+    data: result,
+  });
+});
+
+const getTeacherById = catchAsync(async (req, res) => {
+  const result = await TeacherService.getTeacherById(req.params.id);
+  sendResponse(res, {
+    statusCode: 200,
+    success: true,
+    message: "Teacher retrieved successfully",
+    data: result,
+  });
+});
+
 const TeacherController = {
   getProfile,
   updateProfile,
@@ -80,6 +100,8 @@ const TeacherController = {
   cancelSubscription,
   renewSubscription,
   getSubscriptionPlans,
+  getAllTeachers,
+  getTeacherById,
 };
 
 module.exports = { TeacherController };
