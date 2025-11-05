@@ -14,7 +14,8 @@ const SuperAdmin = require("../superAdmin/SuperAdmin");
 const validateFields = require("../../../util/validateFields");
 const EmailHelpers = require("../../../util/emailHelpers");
 const Admin = require("../admin/Admin");
-const Teacher = require("../teacher/Teacher")
+const Teacher = require("../teacher/Teacher");
+const postNotification = require("../../../util/postNotification");
 
 
 
@@ -177,6 +178,18 @@ const activateAccount = async (payload) => {
       break;
     default:
       result = await Auth.findOne({ authId: auth._id }).lean();
+  }
+
+  // Send notification to admin when new student/teacher/school registers
+  if (auth.role === EnumUserRole.STUDENT || auth.role === EnumUserRole.TEACHER || auth.role === EnumUserRole.SCHOOL) {
+    try {
+      await postNotification(
+        "New User Registration",
+        `A new ${auth.role.toLowerCase()} has registered: ${result.firstname} ${result.lastname} (${email})`
+      );
+    } catch (notificationError) {
+      logger.error("Failed to send admin notification:", notificationError);
+    }
   }
 
   const tokenPayload = {

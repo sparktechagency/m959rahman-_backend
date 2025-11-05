@@ -7,6 +7,9 @@ const Question = require("../../module/curriculum/Question");
 const validateFields = require("../../../util/validateFields");
 const QueryBuilder = require("../../../builder/queryBuilder");
 const unlinkFile = require("../../../util/unlinkFile");
+const postNotification = require("../../../util/postNotification");
+const Teacher = require("../../module/teacher/Teacher");
+// const School = require("../../module/school/School");
 
 const createCurriculum = async (req) => {
   const { body: data, user } = req;
@@ -25,6 +28,34 @@ const createCurriculum = async (req) => {
     ...data,
     createdBy: user.authId,
   });
+
+  // Send notifications to teachers and schools about new curriculum
+  try {
+    const [teachers, schools] = await Promise.all([
+      Teacher.find({ isActive: true }).select('_id').lean(),
+      // School.find({ isActive: true }).select('_id').lean()
+    ]);
+
+    // Notify all teachers
+    for (const teacher of teachers) {
+      await postNotification(
+        "New Curriculum Added",
+        `A new curriculum "${curriculum.name}" has been added to the platform. Check it out in your dashboard.`,
+        teacher._id
+      );
+    }
+
+    // Notify all schools
+    for (const school of schools) {
+      await postNotification(
+        "New Curriculum Added",
+        `A new curriculum "${curriculum.name}" has been added to the platform. Check it out in your dashboard.`,
+        school._id
+      );
+    }
+  } catch (notificationError) {
+    console.error("Failed to send curriculum notifications:", notificationError);
+  }
 
   return curriculum;
 };
@@ -178,6 +209,34 @@ const createTopic = async (req) => {
     ...data,
     createdBy: user.authId,
   });
+
+  // Send notifications to teachers and schools about new topic
+  try {
+    const [teachers, schools] = await Promise.all([
+      Teacher.find({ isActive: true }).select('_id').lean(),
+      School.find({ isActive: true }).select('_id').lean()
+    ]);
+
+    // Notify all teachers
+    for (const teacher of teachers) {
+      await postNotification(
+        "New Topic Added",
+        `A new topic "${topic.name}" has been added to the curriculum "${curriculum.name}". Check it out in your dashboard.`,
+        teacher._id
+      );
+    }
+
+    // Notify all schools
+    for (const school of schools) {
+      await postNotification(
+        "New Topic Added",
+        `A new topic "${topic.name}" has been added to the curriculum "${curriculum.name}". Check it out in your dashboard.`,
+        school._id
+      );
+    }
+  } catch (notificationError) {
+    console.error("Failed to send topic notifications:", notificationError);
+  }
 
   return await topic.populate("curriculumId", "name");
 };
@@ -368,7 +427,7 @@ const createQuestion = async (req) => {
   const topic = await Topic.findOne({
     _id: data.topicId,
     isActive: true,
-  });
+  }).populate("curriculumId", "name");
 
   if (!topic) {
     throw new ApiError(status.NOT_FOUND, "Topic not found");
@@ -404,6 +463,35 @@ const createQuestion = async (req) => {
   }
 
   const question = await Question.create(questionData);
+
+  // Send notifications to teachers and schools about new question
+  try {
+    const [teachers, schools] = await Promise.all([
+      Teacher.find({ isActive: true }).select('_id').lean(),
+      School.find({ isActive: true }).select('_id').lean()
+    ]);
+
+    // Notify all teachers
+    for (const teacher of teachers) {
+      await postNotification(
+        "New Question Added",
+        `A new question has been added to the topic "${topic.name}" in curriculum "${topic.curriculumId.name}". Check it out in your dashboard.`,
+        teacher._id
+      );
+    }
+
+    // Notify all schools
+    for (const school of schools) {
+      await postNotification(
+        "New Question Added",
+        `A new question has been added to the topic "${topic.name}" in curriculum "${topic.curriculumId.name}". Check it out in your dashboard.`,
+        school._id
+      );
+    }
+  } catch (notificationError) {
+    console.error("Failed to send question notifications:", notificationError);
+  }
+
   return await question.populate("topicId", "name");
 };
 
@@ -417,14 +505,14 @@ const getQuestionsByTopic = async (topicId, query) => {
     Question.find({ topicId, isActive: true })
       .populate("topicId", "name")
       .populate("createdBy", "name email")
+      .select("questionText attachments partialMarks fullMarks topicId createdBy createdAt updatedAt")
       .lean(),
     query
   )
     .search(["questionText"])
     .filter()
     .sort()
-    .paginate()
-    .fields();
+    .paginate();
 
   const [questions, meta] = await Promise.all([
     questionQuery.modelQuery,

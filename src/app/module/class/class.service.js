@@ -12,6 +12,7 @@ const QueryBuilder = require("../../../builder/queryBuilder");
 const Curriculum = require("../../module/curriculum/Curriculum");
 const Topic = require("../../module/curriculum/Topic");
 const Question = require("../../module/curriculum/Question");
+const postNotification = require("../../../util/postNotification");
 
 const createClass = async (req) => {
     const { body: data, user } = req;
@@ -206,6 +207,17 @@ const addStudentToClass = async (classId, data) => {
         }
 
         await session.commitTransaction();
+
+        // Send notification to the student when added to class
+        try {
+            await postNotification(
+                "Added to Class",
+                `You have been added to the class "${classData.name}". Check your dashboard for new assignments.`,
+                student._id
+            );
+        } catch (notificationError) {
+            console.error("Failed to send student notification:", notificationError);
+        }
 
         return await Class.findById(classId)
             .populate("students.studentId", "firstName lastName email")
@@ -451,6 +463,20 @@ const addAssignmentToClass = async (classId, data) => {
         await StudentAssignment.insertMany(studentAssignments, { ordered: false });
     }
 
+    // Send notifications to all active students about the new assignment
+    try {
+        const activeStudents = classData.students.filter(s => s.status === 'active');
+        for (const student of activeStudents) {
+            await postNotification(
+                "New Assignment Posted",
+                `A new assignment "${assignment.title}" has been posted to your class "${classData.name}". Due date: ${assignment.dueDate || 'No due date set'}.`,
+                student.studentId
+            );
+        }
+    } catch (notificationError) {
+        console.error("Failed to send assignment notifications:", notificationError);
+    }
+
     return updatedAssignment;
 };
 
@@ -545,7 +571,7 @@ const getClassAssignments = async (classId) => {
     }
 
     const classData = await Class.findById(classId)
-        .populate("assignments.assignmentId", "title assignmentCode description totalMarks duration")
+        .populate("assignments.assignmentId", "assignmentName dueDate")
         .lean();
 
     if (!classData) {
@@ -711,7 +737,7 @@ const getQuestionsByCurriculumAndTopic = async (query) => {
     }
 
     const questions = await Question.find(questionQuery)
-        .select("questionText questionImage partialMarks fullMarks")
+        .select("questionText questionImage attachments partialMarks fullMarks")
         .sort({ createdAt: -1 })
         .lean();
 
@@ -752,7 +778,7 @@ const getMyAssignments = async (userData, query) => {
         Assignment.find({ teacherId: userData.authId, isActive: true })
             .populate("curriculumId", "name")
             .populate("topicId", "name")
-            .populate("questions", "questionText questionImage")
+            .populate("questions", "questionText questionImage attachments partialMarks fullMarks")
             .lean(),
         query
     )
@@ -785,7 +811,7 @@ const updateAssignment = async (id, data) => {
     )
         .populate("curriculumId", "name")
         .populate("topicId", "name")
-        .populate("questions", "questionText questionImage");
+        .populate("questions", "questionText questionImage attachments partialMarks fullMarks");
 
     if (!assignment) {
         throw new ApiError(status.NOT_FOUND, "Assignment not found");
@@ -864,7 +890,7 @@ const addQuestionsToAssignment = async (assignmentId, data) => {
             } 
         },
         { new: true }
-    ).populate("questions", "questionText questionImage partialMarks fullMarks");
+    ).populate("questions", "questionText questionImage attachments partialMarks fullMarks");
 
     if (!updatedAssignment) {
         throw new ApiError(status.NOT_FOUND, "Assignment not found");

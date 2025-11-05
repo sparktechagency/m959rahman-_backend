@@ -1,5 +1,5 @@
-// const AdminNotification = require("../app/module/notification/AdminNotification");
-// const Notification = require("../app/module/notification/Notification");
+const AdminNotification = require("../app/module/notification/AdminNotification");
+const Notification = require("../app/module/notification/Notification");
 const catchAsync = require("./catchAsync");
 
 const postNotification = catchAsync(async (title, message, toId = null) => {
