@@ -16,7 +16,7 @@ router
     .patch("/:id", auth(config.auth_level.teacher), ClassController.updateClass)
     .delete("/:id", auth(config.auth_level.teacher), ClassController.deleteClass)
     .post("/:id/students", auth(config.auth_level.teacher), ClassController.addStudentToClass)
-    .delete("/:id/students", auth(config.auth_level.teacher), ClassController.removeStudentFromClass)
+    .delete("/:id/remove-student", auth(config.auth_level.teacher), ClassController.removeStudentFromClass)
     .get("/:id/students", auth(config.auth_level.teacher), ClassController.getStudentsInClass);
 
 // Assignment routes within class
