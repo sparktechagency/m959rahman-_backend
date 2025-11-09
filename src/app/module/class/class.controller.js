@@ -91,6 +91,16 @@ const addAssignmentToClass = catchAsync(async (req, res) => {
     });
 });
 
+const assignAssignmentToStudents = catchAsync(async (req, res) => {
+    const result = await ClassService.assignAssignmentToStudents(req.params.classId, req.body);
+    sendResponse(res, {
+        statusCode: 200,
+        success: true,
+        message: result.message,
+        data: result,
+    });
+});
+
 const removeAssignmentFromClass = catchAsync(async (req, res) => {
     const result = await ClassService.removeAssignmentFromClass(req.params.classId, req.body);
     sendResponse(res, {
@@ -224,6 +234,7 @@ const ClassController = {
     removeStudentFromClass,
     getStudentsInClass,
     addAssignmentToClass,
+    assignAssignmentToStudents,
     removeAssignmentFromClass,
     getClassAssignments,
     getAssignmentDetails,

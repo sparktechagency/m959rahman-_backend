@@ -49,4 +49,9 @@ router
     StudentController.updateBlockUnblockStudent
   );
 
+// Student assignment routes
+router
+  .get("/my-assignments", auth(config.auth_level.student), StudentController.getMyAssignments)
+  .get("/assignments/:id", auth(config.auth_level.student), StudentController.getAssignmentDetails);
+
 module.exports = router;

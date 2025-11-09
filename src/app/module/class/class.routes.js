@@ -25,8 +25,8 @@ router
     .get("/:classId/assignments", auth(config.auth_level.teacher), ClassController.getClassAssignments)
     .get("/:classId/assignments/:assignmentId", auth(config.auth_level.teacher), ClassController.getAssignmentDetails)
     .delete("/:classId/assignments", auth(config.auth_level.teacher), ClassController.removeAssignmentFromClass)
-    
-    .post("/:classId/assignments", auth(config.auth_level.teacher), ClassController.addAssignmentToClass);
+    .post("/:classId/assignments", auth(config.auth_level.teacher), ClassController.addAssignmentToClass)
+    .post("/:classId/assignments/assign-students", auth(config.auth_level.teacher), ClassController.assignAssignmentToStudents);
 
 // General assignment routes (for teacher's all assignments)
 router

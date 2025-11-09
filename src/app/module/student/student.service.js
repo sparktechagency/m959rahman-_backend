@@ -6,6 +6,9 @@ const unlinkFile = require("../../../util/unlinkFile");
 const validateFields = require("../../../util/validateFields");
 const QueryBuilder = require("../../../builder/queryBuilder");
 const mongoose = require("mongoose");
+const StudentAssignment = require("../class/StudentAssignment");
+const Assignment = require("../class/Assignment");
+const Class = require("../class/Class");
 
 const updateProfile = async (req) => {
   const { files, body: data } = req;
@@ -179,6 +182,135 @@ const getStudentDetailsForAdmin = async (studentId) => {
   return student;
 };
 
+// Get all assignments assigned to the authenticated student
+const getMyAssignments = async (studentData, query) => {
+  const { userId } = studentData;
+
+  // Verify student exists
+  const student = await Student.findById(userId);
+  if (!student) {
+    throw new ApiError(status.NOT_FOUND, "Student not found");
+  }
+
+  // Build query for student assignments
+  const assignmentQuery = new QueryBuilder(
+    StudentAssignment.find({ studentId: userId })
+      .populate({
+        path: 'assignmentId',
+        select: 'assignmentName description dueDate totalMarks duration curriculumId topicId',
+        populate: [
+          { path: 'curriculumId', select: 'name' },
+          { path: 'topicId', select: 'name' }
+        ]
+      })
+      .populate({
+        path: 'classId',
+        select: 'name classCode'
+      })
+      .sort('-createdAt')
+      .lean(),
+    query
+  )
+    .filter()
+    .sort()
+    .paginate()
+    .fields();
+
+  const [assignments, meta] = await Promise.all([
+    assignmentQuery.modelQuery,
+    assignmentQuery.countTotal(),
+  ]);
+
+  // Filter out assignments where assignmentId or classId is null (deleted)
+  const validAssignments = assignments.filter(
+    a => a.assignmentId !== null && a.classId !== null
+  );
+
+  // Format response
+  const formattedAssignments = validAssignments.map(assignment => ({
+    _id: assignment._id,
+    assignment: {
+      _id: assignment.assignmentId._id,
+      name: assignment.assignmentId.assignmentName,
+      description: assignment.assignmentId.description,
+      dueDate: assignment.assignmentId.dueDate,
+      totalMarks: assignment.assignmentId.totalMarks,
+      duration: assignment.assignmentId.duration,
+      curriculum: assignment.assignmentId.curriculumId?.name || 'N/A',
+      topic: assignment.assignmentId.topicId?.name || 'N/A'
+    },
+    class: {
+      _id: assignment.classId._id,
+      name: assignment.classId.name,
+      classCode: assignment.classId.classCode
+    },
+    status: assignment.status,
+    totalMarksObtained: assignment.totalMarksObtained,
+    completionRate: assignment.completionRate,
+    startedAt: assignment.startedAt,
+    submittedAt: assignment.submittedAt,
+    gradedAt: assignment.gradedAt,
+    createdAt: assignment.createdAt
+  }));
+
+  return {
+    meta,
+    assignments: formattedAssignments,
+  };
+};
+
+// Get single assignment details for student
+const getAssignmentDetails = async (studentData, assignmentId) => {
+  const { userId } = studentData;
+
+  if (!mongoose.Types.ObjectId.isValid(assignmentId)) {
+    throw new ApiError(status.BAD_REQUEST, "Invalid assignment ID");
+  }
+
+  // Find the student assignment
+  const studentAssignment = await StudentAssignment.findOne({
+    _id: assignmentId,
+    studentId: userId
+  })
+    .populate({
+      path: 'assignmentId',
+      populate: [
+        { 
+          path: 'questions',
+          select: 'questionText questionImage partialMarks fullMarks attachments'
+        },
+        { path: 'curriculumId', select: 'name' },
+        { path: 'topicId', select: 'name' }
+      ]
+    })
+    .populate({
+      path: 'classId',
+      select: 'name classCode'
+    })
+    .lean();
+
+  if (!studentAssignment) {
+    throw new ApiError(status.NOT_FOUND, "Assignment not found or not assigned to you");
+  }
+
+  if (!studentAssignment.assignmentId) {
+    throw new ApiError(status.NOT_FOUND, "Assignment has been deleted");
+  }
+
+  return {
+    _id: studentAssignment._id,
+    assignment: studentAssignment.assignmentId,
+    class: studentAssignment.classId,
+    answers: studentAssignment.answers,
+    totalMarksObtained: studentAssignment.totalMarksObtained,
+    completionRate: studentAssignment.completionRate,
+    status: studentAssignment.status,
+    startedAt: studentAssignment.startedAt,
+    submittedAt: studentAssignment.submittedAt,
+    gradedAt: studentAssignment.gradedAt
+  };
+};
+
 const StudentService = {
   getProfile,
   deleteMyAccount,
@@ -188,6 +320,8 @@ const StudentService = {
   updateBlockUnblockStudent,
   getAllStudentsForAdmin,
   getStudentDetailsForAdmin,
+  getMyAssignments,
+  getAssignmentDetails,
 };
 
 module.exports = { StudentService };

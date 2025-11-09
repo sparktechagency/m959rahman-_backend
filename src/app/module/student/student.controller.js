@@ -85,6 +85,29 @@ const getStudentDetailsForAdmin = catchAsync(async (req, res) => {
   });
 });
 
+// Get all assignments for the authenticated student
+const getMyAssignments = catchAsync(async (req, res) => {
+  const result = await StudentService.getMyAssignments(req.user, req.query);
+  sendResponse(res, {
+    statusCode: 200,
+    success: true,
+    message: "Assignments retrieved successfully",
+    data: result.assignments,
+    meta: result.meta,
+  });
+});
+
+// Get single assignment details for student
+const getAssignmentDetails = catchAsync(async (req, res) => {
+  const result = await StudentService.getAssignmentDetails(req.user, req.params.id);
+  sendResponse(res, {
+    statusCode: 200,
+    success: true,
+    message: "Assignment details retrieved successfully",
+    data: result,
+  });
+});
+
 const StudentController = {
   updateProfile,
   getProfile,
@@ -94,6 +117,8 @@ const StudentController = {
   getAllStudents,
   getAllStudentsForAdmin,
   getStudentDetailsForAdmin,
+  getMyAssignments,
+  getAssignmentDetails,
 };
 
 module.exports = { StudentController };

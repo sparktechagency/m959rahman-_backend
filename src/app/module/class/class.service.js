@@ -613,6 +613,118 @@ const addAssignmentToClass = async (classId, data) => {
 //     }
 // };
 
+// Assign assignment to specific students in a class
+const assignAssignmentToStudents = async (classId, data) => {
+    validateFields(data, ["assignmentId", "studentEmails"]);
+
+    if (!mongoose.Types.ObjectId.isValid(classId)) {
+        throw new ApiError(status.BAD_REQUEST, "Invalid class ID");
+    }
+
+    // Verify class and assignment exist
+    const [classData, assignment] = await Promise.all([
+        Class.findById(classId).lean(),
+        Assignment.findById(data.assignmentId).lean()
+    ]);
+
+    if (!classData) {
+        throw new ApiError(status.NOT_FOUND, "Class not found");
+    }
+
+    if (!assignment) {
+        throw new ApiError(status.NOT_FOUND, "Assignment not found");
+    }
+
+    // Verify assignment is in the class
+    const assignmentInClass = classData.assignments.find(
+        a => a.assignmentId.toString() === data.assignmentId
+    );
+
+    if (!assignmentInClass) {
+        throw new ApiError(status.BAD_REQUEST, "Assignment is not in this class");
+    }
+
+    // Find students by email
+    const students = await Student.find({
+        email: { $in: data.studentEmails }
+    }).lean();
+
+    if (students.length === 0) {
+        throw new ApiError(status.NOT_FOUND, "No students found with provided emails");
+    }
+
+    console.log("Assigning to students:", {
+        assignmentId: data.assignmentId,
+        classId,
+        studentCount: students.length,
+        studentEmails: students.map(s => s.email)
+    });
+
+    // Verify students are in the class
+    const classStudentIds = classData.students
+        .filter(s => s.status === 'active')
+        .map(s => s.studentId.toString());
+
+    const validStudents = students.filter(student => 
+        classStudentIds.includes(student._id.toString())
+    );
+
+    if (validStudents.length === 0) {
+        throw new ApiError(status.BAD_REQUEST, "None of the students are active in this class");
+    }
+
+    // Create student assignments (using insertMany with ordered: false to skip duplicates)
+    const studentAssignments = validStudents.map(student => ({
+        studentId: student._id,
+        assignmentId: data.assignmentId,
+        classId: classId,
+        status: "not_started"
+    }));
+
+    try {
+        const result = await StudentAssignment.insertMany(studentAssignments, { 
+            ordered: false // Continue even if some docs fail (e.g., duplicates)
+        });
+
+        // Send notifications to assigned students
+        try {
+            for (const student of validStudents) {
+                await postNotification(
+                    "New Assignment Assigned",
+                    `The assignment "${assignment.assignmentName}" has been assigned to you in class "${classData.name}". Due date: ${assignment.dueDate || 'No due date set'}.`,
+                    student._id
+                );
+            }
+        } catch (notificationError) {
+            console.error("Failed to send assignment notifications:", notificationError);
+        }
+
+        return {
+            success: true,
+            message: "Assignment assigned to students successfully",
+            assignedCount: result.length,
+            assignedStudents: validStudents.map(s => ({
+                _id: s._id,
+                email: s.email,
+                firstName: s.firstName,
+                lastName: s.lastName
+            }))
+        };
+    } catch (error) {
+        // Handle duplicate key errors gracefully
+        if (error.code === 11000) {
+            // Some students already have this assignment
+            const insertedCount = error.insertedDocs?.length || 0;
+            return {
+                success: true,
+                message: `Assignment assigned successfully. ${insertedCount} new assignments created, some students already had this assignment.`,
+                assignedCount: insertedCount
+            };
+        }
+        throw error;
+    }
+};
+
 const removeAssignmentFromClass = async (classId, data) => {
     validateFields(data, ["assignmentId"]);
 
@@ -660,10 +772,20 @@ const getClassAssignments = async (classId) => {
         throw new ApiError(status.NOT_FOUND, "Class not found");
     }
 
-    // Get assignment statistics
+    // Clean up null assignment references (assignments that were deleted)
+    const hasNullAssignments = classData.assignments.some(a => a.assignmentId === null);
+    if (hasNullAssignments) {
+        console.log("Cleaning up null assignment references for class:", classId);
+        await Class.updateOne(
+            { _id: classId },
+            { $pull: { assignments: { assignmentId: null } } }
+        );
+    }
+
+    // Get assignment statistics (filter out null/deleted assignments)
     const assignmentsWithStats = await Promise.all(
         classData.assignments
-            .filter(a => a.status === 'active')
+            .filter(a => a.status === 'active' && a.assignmentId !== null)
             .map(async (assignment) => {
                 const stats = await StudentAssignment.aggregate([
                     {
@@ -1090,6 +1212,7 @@ const ClassService = {
     removeStudentFromClass,
     getStudentsInClass,
     addAssignmentToClass,
+    assignAssignmentToStudents,
     removeAssignmentFromClass,
     getClassAssignments,
     getAssignmentDetails,
