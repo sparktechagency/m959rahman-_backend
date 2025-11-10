@@ -502,6 +502,8 @@ const getStudentsInClass = async (classId) => {
 const addAssignmentToClass = async (classId, data) => {
     validateFields(data, ["assignmentId"]);
 
+    console.log("addAssignmentToClass called with classId:", classId);
+    console.log("addAssignmentToClass called with data:", data);
     const [classData, assignment] = await Promise.all([
         Class.findById(classId),
         Assignment.findById(data.assignmentId)
@@ -673,56 +675,110 @@ const assignAssignmentToStudents = async (classId, data) => {
         throw new ApiError(status.BAD_REQUEST, "None of the students are active in this class");
     }
 
-    // Create student assignments (using insertMany with ordered: false to skip duplicates)
-    const studentAssignments = validStudents.map(student => ({
-        studentId: student._id,
+    // Check which students already have this assignment
+    const existingAssignments = await StudentAssignment.find({
         assignmentId: data.assignmentId,
-        classId: classId,
-        status: "not_started"
-    }));
+        studentId: { $in: validStudents.map(s => s._id) }
+    }).lean();
 
-    try {
-        const result = await StudentAssignment.insertMany(studentAssignments, { 
-            ordered: false // Continue even if some docs fail (e.g., duplicates)
-        });
+    const existingStudentIds = new Set(
+        existingAssignments.map(a => a.studentId.toString())
+    );
 
-        // Send notifications to assigned students
-        try {
-            for (const student of validStudents) {
-                await postNotification(
-                    "New Assignment Assigned",
-                    `The assignment "${assignment.assignmentName}" has been assigned to you in class "${classData.name}". Due date: ${assignment.dueDate || 'No due date set'}.`,
-                    student._id
-                );
-            }
-        } catch (notificationError) {
-            console.error("Failed to send assignment notifications:", notificationError);
-        }
+    // Filter students who don't have the assignment yet
+    const studentsToAssign = validStudents.filter(
+        student => !existingStudentIds.has(student._id.toString())
+    );
 
+    const alreadyAssignedStudents = validStudents.filter(
+        student => existingStudentIds.has(student._id.toString())
+    );
+
+    if (studentsToAssign.length === 0) {
         return {
-            success: true,
-            message: "Assignment assigned to students successfully",
-            assignedCount: result.length,
-            assignedStudents: validStudents.map(s => ({
+            success: false,
+            message: "All students already have this assignment",
+            assignedCount: 0,
+            alreadyAssignedCount: alreadyAssignedStudents.length,
+            alreadyAssignedStudents: alreadyAssignedStudents.map(s => ({
                 _id: s._id,
                 email: s.email,
                 firstName: s.firstName,
                 lastName: s.lastName
             }))
         };
-    } catch (error) {
-        // Handle duplicate key errors gracefully
-        if (error.code === 11000) {
-            // Some students already have this assignment
-            const insertedCount = error.insertedDocs?.length || 0;
-            return {
-                success: true,
-                message: `Assignment assigned successfully. ${insertedCount} new assignments created, some students already had this assignment.`,
-                assignedCount: insertedCount
-            };
-        }
-        throw error;
     }
+
+    // Create student assignments for new students
+    const studentAssignments = studentsToAssign.map(student => ({
+        studentId: student._id,
+        assignmentId: data.assignmentId,
+        classId: classId,
+        status: "not_started"
+    }));
+
+    const result = await StudentAssignment.insertMany(studentAssignments);
+
+    // Send notifications to newly assigned students
+    try {
+        for (const student of studentsToAssign) {
+            await postNotification(
+                "New Assignment Assigned",
+                `The assignment "${assignment.assignmentName}" has been assigned to you in class "${classData.name}". Due date: ${assignment.dueDate || 'No due date set'}.`,
+                student._id
+            );
+        }
+    } catch (notificationError) {
+        console.error("Failed to send assignment notifications:", notificationError);
+    }
+
+    return {
+        success: true,
+        message: `Assignment assigned successfully to ${result.length} student(s)${alreadyAssignedStudents.length > 0 ? `, ${alreadyAssignedStudents.length} already had it` : ''}`,
+        assignedCount: result.length,
+        alreadyAssignedCount: alreadyAssignedStudents.length,
+        newlyAssignedStudents: studentsToAssign.map(s => ({
+            _id: s._id,
+            email: s.email,
+            firstName: s.firstName,
+            lastName: s.lastName
+        })),
+        alreadyAssignedStudents: alreadyAssignedStudents.map(s => ({
+            _id: s._id,
+            email: s.email,
+            firstName: s.firstName,
+            lastName: s.lastName
+        }))
+    }
+};
+
+const getStudentsOfAssignment = async (classId, data) => {
+    validateFields(data, ["assignmentId"]);
+
+    const assignment = await Assignment.findById(data.assignmentId).populate('classId').lean();
+
+    if (!assignment) {
+        throw new ApiError(status.NOT_FOUND, "Assignment not found");
+    }
+
+    const classStudentIds = assignment.classId.students
+        .filter(s => s.status === 'active')
+        .map(s => s.studentId.toString());
+
+    const students = await Student.find({
+        _id: { $in: classStudentIds }
+    }).lean();
+
+    return {
+        success: true,
+        message: `Successfully retrieved ${students.length} students of this assignment`,
+        students: students.map(student => ({
+            _id: student._id,
+            email: student.email,
+            firstName: student.firstName,
+            lastName: student.lastName
+        }))
+    };
 };
 
 const removeAssignmentFromClass = async (classId, data) => {
@@ -872,7 +928,6 @@ const getAssignmentDetails = async (classId, assignmentId) => {
     };
 };
 
-
 const getAllAssignmentsByTeacherId = async (teacherId) => {
     if (!mongoose.Types.ObjectId.isValid(teacherId)) {
         throw new ApiError(status.BAD_REQUEST, "Invalid teacher ID");
@@ -884,9 +939,6 @@ const getAllAssignmentsByTeacherId = async (teacherId) => {
 
     return assignments;
 };
-
-
-//------------------------------------------------------------------------------
 
 const createAssignment = async (req) => {
     const { body: data, user } = req;
@@ -1226,6 +1278,7 @@ const ClassService = {
     deleteAssignment,
     addQuestionsToAssignment,
     removeQuestionsFromAssignment,
+    getStudentsOfAssignment
 
 };
 
