@@ -58,6 +58,12 @@ const StudentAssignmentSchema = new Schema(
     gradedAt: {
       type: Date,
     },
+    unassignedAt: {
+      type: Date,
+    },
+    reactivatedAt: {
+      type: Date,
+    },
   },
   {
     timestamps: true,

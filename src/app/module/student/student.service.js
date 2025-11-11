@@ -199,13 +199,22 @@ const getMyAssignments = async (studentData, query) => {
         path: 'assignmentId',
         select: 'assignmentName description dueDate totalMarks duration curriculumId topicId',
         populate: [
-          { path: 'curriculumId', select: 'name' },
-          { path: 'topicId', select: 'name' }
+          { 
+            path: 'curriculumId', 
+            select: 'name',
+            match: { isActive: true }
+          },
+          { 
+            path: 'topicId', 
+            select: 'name',
+            match: { isActive: true }
+          }
         ]
       })
       .populate({
         path: 'classId',
-        select: 'name classCode'
+        select: 'name classCode',
+        match: { isActive: true }
       })
       .sort('-createdAt')
       .lean(),
@@ -231,22 +240,22 @@ const getMyAssignments = async (studentData, query) => {
     _id: assignment._id,
     assignment: {
       _id: assignment.assignmentId._id,
-      name: assignment.assignmentId.assignmentName,
-      description: assignment.assignmentId.description,
+      name: assignment.assignmentId.assignmentName || 'Untitled Assignment',
+      description: assignment.assignmentId.description || 'No description available',
       dueDate: assignment.assignmentId.dueDate,
-      totalMarks: assignment.assignmentId.totalMarks,
-      duration: assignment.assignmentId.duration,
-      curriculum: assignment.assignmentId.curriculumId?.name || 'N/A',
-      topic: assignment.assignmentId.topicId?.name || 'N/A'
+      totalMarks: assignment.assignmentId.totalMarks || 0,
+      duration: assignment.assignmentId.duration || 0,
+      curriculum: assignment.assignmentId.curriculumId?.name || 'General',
+      topic: assignment.assignmentId.topicId?.name || 'General Topic'
     },
     class: {
       _id: assignment.classId._id,
-      name: assignment.classId.name,
-      classCode: assignment.classId.classCode
+      name: assignment.classId.name || 'Unknown Class',
+      classCode: assignment.classId.classCode || 'N/A'
     },
-    status: assignment.status,
-    totalMarksObtained: assignment.totalMarksObtained,
-    completionRate: assignment.completionRate,
+    status: assignment.status || 'pending',
+    totalMarksObtained: assignment.totalMarksObtained || 0,
+    completionRate: assignment.completionRate || 0,
     startedAt: assignment.startedAt,
     submittedAt: assignment.submittedAt,
     gradedAt: assignment.gradedAt,

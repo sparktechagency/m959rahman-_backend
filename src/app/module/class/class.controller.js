@@ -111,6 +111,44 @@ const getStudentsOfAssignment = catchAsync(async (req, res) => {
     });
 });
 
+const getStudentAssignmentsInClass = catchAsync(async (req, res) => {
+    const result = await ClassService.getStudentAssignmentsInClass(req.params.classId, req.params.studentId);
+    sendResponse(res, {
+        statusCode: 200,
+        success: true,
+        message: "Student assignments retrieved successfully",
+        data: result,
+    });
+});
+
+const getStudentAssignmentSubmission = catchAsync(async (req, res) => {
+    const result = await ClassService.getStudentAssignmentSubmission(
+        req.params.classId, 
+        req.params.studentId, 
+        req.params.assignmentId
+    );
+    sendResponse(res, {
+        statusCode: 200,
+        success: true,
+        message: "Student assignment submission retrieved successfully",
+        data: result,
+    });
+});
+
+const removeAssignmentFromStudent = catchAsync(async (req, res) => {
+    const result = await ClassService.removeAssignmentFromStudent(
+        req.params.classId, 
+        req.params.studentId, 
+        req.body
+    );
+    sendResponse(res, {
+        statusCode: 200,
+        success: true,
+        message: result.message,
+        data: result,
+    });
+});
+
 const removeAssignmentFromClass = catchAsync(async (req, res) => {
     const result = await ClassService.removeAssignmentFromClass(req.params.classId, req.body);
     sendResponse(res, {
@@ -257,7 +295,10 @@ const ClassController = {
     deleteAssignment,
     addQuestionsToAssignment,
     removeQuestionsFromAssignment,
-    getStudentsOfAssignment
+    getStudentsOfAssignment,
+    getStudentAssignmentsInClass,
+    getStudentAssignmentSubmission,
+    removeAssignmentFromStudent
 };
 
 module.exports = { ClassController };
