@@ -14,6 +14,7 @@ router
     uploadFile([{ name: "profile_image", maxCount: 1 }]),
     TeacherController.updateProfile
   )
+  .get("/students", auth(config.auth_level.teacher), TeacherController.getAllStudentsForTeacher) 
   .get("/all", auth(config.auth_level.admin), TeacherController.getAllTeachers)
   .get("/:id", auth(config.auth_level.admin), TeacherController.getTeacherById)
 //   .get("/subscription", auth(config.auth_level.teacher), TeacherController.getSubscription)

@@ -92,6 +92,17 @@ const getTeacherById = catchAsync(async (req, res) => {
   });
 });
 
+const getAllStudentsForTeacher = catchAsync(async (req, res) => {
+  const result = await TeacherService.getAllStudentsForTeacher(req.user);
+  sendResponse(res, {
+    statusCode: 200,
+    success: true,
+    message: "Students retrieved successfully",
+    data: result,
+  });
+});
+
+
 const TeacherController = {
   getProfile,
   updateProfile,
@@ -102,6 +113,7 @@ const TeacherController = {
   getSubscriptionPlans,
   getAllTeachers,
   getTeacherById,
+  getAllStudentsForTeacher
 };
 
 module.exports = { TeacherController };

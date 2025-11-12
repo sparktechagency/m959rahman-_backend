@@ -102,7 +102,7 @@ const assignAssignmentToStudents = catchAsync(async (req, res) => {
 });
 
 const getStudentsOfAssignment = catchAsync(async (req, res) => {
-    const result = await ClassService.getStudentsOfAssignment(req.params.classId, req.body);
+    const result = await ClassService.getStudentsOfAssignment(req.params.classId, req.params.assignmentId);
     sendResponse(res, {
         statusCode: 200,
         success: true,

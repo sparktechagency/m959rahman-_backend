@@ -286,7 +286,7 @@ const getAssignmentDetails = async (studentData, assignmentId) => {
       populate: [
         { 
           path: 'questions',
-          select: 'questionText questionImage partialMarks fullMarks attachments'
+          select: 'questionText questionImage attachments'
         },
         { path: 'curriculumId', select: 'name' },
         { path: 'topicId', select: 'name' }

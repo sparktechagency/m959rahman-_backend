@@ -8,6 +8,8 @@ const Auth = require("../auth/Auth");
 const validateFields = require("../../../util/validateFields");
 const unlinkFile = require("../../../util/unlinkFile");
 const QueryBuilder = require("../../../builder/queryBuilder");
+const Student = require("../student/Student");
+const Class = require("../class/Class");
 
 const getProfile = async (userData) => {
   const { userId, authId } = userData;
@@ -291,6 +293,151 @@ const getTeacherById = async (id) => {
   return formattedTeacher;
 };
 
+const getAllStudentsForTeacher = async (userData, query) => {
+  const { authId } = userData;
+
+  // Get all active classes for the teacher
+  const classes = await Class.find({
+    teacherId: authId,
+    isActive: true,
+  })
+    .populate({
+      path: "students.studentId",
+      select: "firstName lastName email profile_image phoneNumber dateOfBirth",
+    })
+    .lean();
+
+  if (!classes || classes.length === 0) {
+    return {
+      meta: {
+        page: 1,
+        limit: 10,
+        total: 0,
+        totalPage: 0,
+      },
+      students: [],
+      classesSummary: {
+        totalClasses: 0,
+        classDetails: [],
+      },
+    };
+  }
+
+  // Collect all unique students across all classes
+  const studentMap = new Map();
+
+  classes.forEach((classItem) => {
+    // Filter only active students
+    const activeStudents = classItem.students.filter(
+      (s) => s.status === "active" && s.studentId
+    );
+
+    activeStudents.forEach((student) => {
+      const studentId = student.studentId._id.toString();
+
+      if (!studentMap.has(studentId)) {
+        // First time seeing this student
+        studentMap.set(studentId, {
+          _id: student.studentId._id,
+          firstName: student.studentId.firstName || "N/A",
+          lastName: student.studentId.lastName || "N/A",
+          fullName: `${student.studentId.firstName || ""} ${
+            student.studentId.lastName || ""
+          }`.trim(),
+          email: student.studentId.email,
+          profile_image: student.studentId.profile_image,
+          phoneNumber: student.studentId.phoneNumber,
+          dateOfBirth: student.studentId.dateOfBirth,
+          classes: [
+            {
+              classId: classItem._id,
+              className: classItem.name,
+              classCode: classItem.classCode,
+              joinedAt: student.joinedAt,
+            },
+          ],
+          totalClasses: 1,
+        });
+      } else {
+        // Student already exists, add this class to their list
+        const existingStudent = studentMap.get(studentId);
+        existingStudent.classes.push({
+          classId: classItem._id,
+          className: classItem.name,
+          classCode: classItem.classCode,
+          joinedAt: student.joinedAt,
+        });
+        existingStudent.totalClasses += 1;
+      }
+    });
+  });
+
+  // Convert map to array
+  let students = Array.from(studentMap.values());
+
+  // Apply search filter if searchTerm exists
+  const searchTerm = query?.searchTerm;
+  if (searchTerm) {
+    const searchRegex = new RegExp(searchTerm, "i");
+    students = students.filter(
+      (student) =>
+        searchRegex.test(student.firstName) ||
+        searchRegex.test(student.lastName) ||
+        searchRegex.test(student.fullName) ||
+        searchRegex.test(student.email)
+    );
+  }
+
+  // Apply sorting
+  const sortField = query?.sort || "-fullName";
+  const sortOrder = sortField.startsWith("-") ? -1 : 1;
+  const field = sortField.replace("-", "");
+
+  students.sort((a, b) => {
+    if (field === "totalClasses") {
+      return sortOrder * (a.totalClasses - b.totalClasses);
+    }
+    // Default to fullName sorting
+    return sortOrder * a.fullName.localeCompare(b.fullName);
+  });
+
+  // Calculate pagination
+  const page = Number(query?.page) || 1;
+  const limit = Number(query?.limit) || 10;
+  const total = students.length;
+  const totalPage = Math.ceil(total / limit);
+  const skip = (page - 1) * limit;
+
+  // Apply pagination
+  const paginatedStudents = students.slice(skip, skip + limit);
+
+  // Create classes summary
+  const classesSummary = {
+    totalClasses: classes.length,
+    classDetails: classes.map((classItem) => ({
+      _id: classItem._id,
+      name: classItem.name,
+      classCode: classItem.classCode,
+      studentCount: classItem.students.filter((s) => s.status === "active")
+        .length,
+      assignmentCount: classItem.assignments.filter((a) => a.status === "active")
+        .length,
+    })),
+  };
+
+  return {
+    meta: {
+      page,
+      limit,
+      total,
+      totalPage,
+    },
+    students: paginatedStudents,
+    classesSummary,
+  };
+};
+
+
 
 
 
@@ -305,6 +452,7 @@ const TeacherService = {
   getSubscriptionPlans,
   getAllTeachers,
   getTeacherById,
+  getAllStudentsForTeacher
 };
 
 module.exports = { TeacherService };

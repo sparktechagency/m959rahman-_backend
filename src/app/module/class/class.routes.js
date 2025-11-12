@@ -23,7 +23,7 @@ router
 router
     .post("/assignments", auth(config.auth_level.teacher), ClassController.createAssignment)
     .get("/:classId/assignments", auth(config.auth_level.teacher), ClassController.getClassAssignments)
-    .get("/:classId/assignments/students", auth(config.auth_level.teacher), ClassController.getStudentsOfAssignment)
+    .get("/:classId/assignments/:assignmentId/students", auth(config.auth_level.teacher), ClassController.getStudentsOfAssignment)
     .get("/:classId/assignments/:assignmentId", auth(config.auth_level.teacher), ClassController.getAssignmentDetails)
     .delete("/:classId/assignments", auth(config.auth_level.teacher), ClassController.removeAssignmentFromClass)
     .post("/:classId/assignments", auth(config.auth_level.teacher), ClassController.addAssignmentToClass)

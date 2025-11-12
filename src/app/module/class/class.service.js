@@ -807,9 +807,7 @@ const assignAssignmentToStudents = async (classId, data) => {
 };
 
 //new api
-const getStudentsOfAssignment = async (classId, data) => {
-    validateFields(data, ["assignmentId"]);
-
+const getStudentsOfAssignment = async (classId, assignmentId) => {
     // Check if the assignment exists in this class
     const classData = await Class.findById(classId).lean();
     if (!classData) {
@@ -817,7 +815,7 @@ const getStudentsOfAssignment = async (classId, data) => {
     }
 
     const assignmentExists = classData.assignments.some(
-        assignment => assignment.assignmentId.toString() === data.assignmentId && assignment.status === 'active'
+        assignment => assignment.assignmentId.toString() === assignmentId && assignment.status === 'active'
     );
 
     if (!assignmentExists) {
@@ -826,8 +824,8 @@ const getStudentsOfAssignment = async (classId, data) => {
 
     // Get students who actually have this assignment assigned (only active assignments)
     const studentAssignments = await StudentAssignment.find({
-        assignmentId: data.assignmentId,
-        classId: classId,
+        assignmentId,
+        classId,
         status: { $ne: "inactive" }  // Only show active assignments
     })
     .populate({
