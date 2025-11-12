@@ -10,6 +10,9 @@ async function main() {
     // console.log("JWT_SECRET:", config.jwt.secret);
 
     // mainServer.listen(Number(config.port), config.base_url, () => {
+    // mainServer.listen(Number(config.port), () => {
+    //   logger.info(`App listening on http://${config.base_url}:${config.port}`);
+    // });
     mainServer.listen(Number(config.port), () => {
       logger.info(`App listening on http://${config.base_url}:${config.port}`);
     });

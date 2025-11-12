@@ -1606,7 +1606,6 @@ const ClassService = {
     getStudentAssignmentSubmission,
     getStudentAssignmentsInClass,
     removeAssignmentFromStudent
-
 };
 
 module.exports = ClassService;

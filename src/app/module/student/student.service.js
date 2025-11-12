@@ -194,7 +194,7 @@ const getMyAssignments = async (studentData, query) => {
 
   // Build query for student assignments
   const assignmentQuery = new QueryBuilder(
-    StudentAssignment.find({ studentId: userId })
+    StudentAssignment.find({ studentId: userId, status: { $ne: 'inactive' } })
       .populate({
         path: 'assignmentId',
         select: 'assignmentName description dueDate totalMarks duration curriculumId topicId',
