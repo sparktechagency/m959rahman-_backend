@@ -33,6 +33,9 @@ router
     .get("/:classId/students/:studentId/assignments/:assignmentId", auth(config.auth_level.teacher), ClassController.getStudentAssignmentSubmission)
     .delete("/:classId/students/:studentId/assignments", auth(config.auth_level.teacher), ClassController.removeAssignmentFromStudent)
 
+// Student class joining route
+// router.post("/join", auth(config.auth_level.user), ClassController.joinClassByCode);
+
 // General assignment routes (for teacher's all assignments)
 router
     .post("/assignments/:assignmentId/questions", auth(config.auth_level.teacher), ClassController.addQuestionsToAssignment)

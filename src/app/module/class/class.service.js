@@ -28,9 +28,36 @@ const createClass = async (req) => {
         throw new ApiError(status.BAD_REQUEST, "You can only create up to 7 classes");
     }
 
+    // Generate unique class code with retry mechanism
+    const generateUniqueClassCode = async (maxRetries = 10) => {
+        for (let attempt = 0; attempt < maxRetries; attempt++) {
+            // Generate random 6-digit number
+            const randomDigits = Math.floor(100000 + Math.random() * 900000);
+            const classCode = `T${randomDigits}`;
+            
+            // Check if this code already exists (atomic check)
+            const existingClass = await Class.findOne({ 
+                classCode: classCode,
+                isActive: true 
+            }).lean();
+            
+            if (!existingClass) {
+                return classCode;
+            }
+            
+            // If code exists, try again
+            console.log(`Class code ${classCode} already exists, retrying... (attempt ${attempt + 1})`);
+        }
+        
+        throw new ApiError(status.INTERNAL_SERVER_ERROR, "Unable to generate unique class code after multiple attempts");
+    };
+
+    const uniqueClassCode = await generateUniqueClassCode();
+
     const newClass = await Class.create({
         name: data.name,
         teacherId: user.authId,
+        classCode: uniqueClassCode, // Set the unique code directly
     });
 
     return newClass;
@@ -114,24 +141,55 @@ const deleteClass = async (id) => {
     session.startTransaction();
 
     try {
-        const classData = await Class.findByIdAndUpdate(
-            id,
-            { isActive: false },
-            { new: true, session }
-        );
-
+        // Get class data before deletion for cleanup
+        const classData = await Class.findById(id).session(session);
         if (!classData) {
             throw new ApiError(status.NOT_FOUND, "Class not found");
         }
 
-        // Remove all student assignments for this class
-        await StudentAssignment.updateMany(
-            { classId: id },
-            { status: "inactive" },
+        // 1. Remove all student assignments for this class (set to inactive)
+        const studentAssignmentResult = await StudentAssignment.updateMany(
+            { 
+                classId: id,
+                status: { $ne: "inactive" }
+            },
+            { 
+                status: "inactive",
+                unassignedAt: new Date()
+            },
             { session }
         );
 
+        // 2. Remove classId from all assignments that reference this class
+        await Assignment.updateMany(
+            { classId: id },
+            { $pull: { classId: id } },
+            { session }
+        );
+
+        // 3. Delete the class completely from database
+        const deletedClass = await Class.findByIdAndDelete(id, { session });
+
         await session.commitTransaction();
+
+        
+
+        return {
+            success: true,
+            message: "Class deleted successfully and all associated data cleaned up",
+            class: {
+                _id: classData._id,
+                name: classData.name,
+                classCode: classData.classCode,
+                teacherId: classData.teacherId
+            },
+            cleanupStats: {
+                studentsRemoved: classData.students.filter(s => s.status === 'active').length,
+                assignmentsRemoved: classData.assignments.filter(a => a.status === 'active').length,
+                studentAssignmentsRemoved: studentAssignmentResult.modifiedCount
+            }
+        };
+
     } catch (error) {
         await session.abortTransaction();
         throw error;
@@ -263,56 +321,6 @@ const addStudentToClass = async (classId, data) => {
     }
 };
 
-// const removeStudentFromClass = async (classId, data) => {
-//     validateFields(data, ["studentId"]);
-
-//     if (!mongoose.Types.ObjectId.isValid(classId)) {
-//         throw new ApiError(status.BAD_REQUEST, "Invalid class ID");
-//     }
-
-//     const session = await mongoose.startSession();
-//     session.startTransaction();
-
-//     try {
-//         const classData = await Class.findById(classId).session(session);
-//         if (!classData) {
-//             throw new ApiError(status.NOT_FOUND, "Class not found");
-//         }
-
-//         // Remove student from class (soft delete)
-//         const studentIndex = classData.students.findIndex(
-//             s => s.studentId.toString() === data.studentId && s.status === 'active'
-//         );
-
-//         if (studentIndex === -1) {
-//             throw new ApiError(status.NOT_FOUND, "Student not found in this class");
-//         }
-
-//         classData.students[studentIndex].status = 'inactive';
-//         await classData.save({ session });
-
-//         // Remove student assignments for this class
-//         await StudentAssignment.updateMany(
-//             {
-//                 studentId: data.studentId,
-//                 classId: classId
-//             },
-//             { status: "inactive" },
-//             { session }
-//         );
-
-//         await session.commitTransaction();
-
-//         return await Class.findById(classId)
-//             .populate("students.studentId", "firstName lastName email")
-//             .populate("assignments.assignmentId", "title assignmentCode");
-//     } catch (error) {
-//         await session.abortTransaction();
-//         throw error;
-//     } finally {
-//         session.endSession();
-//     }
-// };
 
 const removeStudentFromClass = async (classId, data) => {
     validateFields(data, ["studentEmail"]);

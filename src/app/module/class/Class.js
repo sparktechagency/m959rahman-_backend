@@ -63,14 +63,7 @@ const ClassSchema = new Schema(
   }
 );
 
-// Pre-save to generate class code
-ClassSchema.pre('save', async function(next) {
-  if (this.isNew) {
-    const count = await mongoose.model('Class').countDocuments();
-    this.classCode = `T${(26590 + count + 1).toString().slice(-5)}`;
-  }
-  next();
-});
+// Class code is now generated in the service layer to ensure uniqueness
 
 const Class = model("Class", ClassSchema);
 

@@ -108,6 +108,16 @@ const getAssignmentDetails = catchAsync(async (req, res) => {
   });
 });
 
+const joinClassByCode = catchAsync(async (req, res) => {
+    const result = await StudentService.joinClassByCode(req.user, req.body);
+    sendResponse(res, {
+        statusCode: 200,
+        success: true,
+        message: result.message,
+        data: result,
+    });
+});
+
 const StudentController = {
   updateProfile,
   getProfile,
@@ -119,6 +129,7 @@ const StudentController = {
   getStudentDetailsForAdmin,
   getMyAssignments,
   getAssignmentDetails,
+  joinClassByCode
 };
 
 module.exports = { StudentController };

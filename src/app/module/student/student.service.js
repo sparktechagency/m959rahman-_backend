@@ -320,6 +320,145 @@ const getAssignmentDetails = async (studentData, assignmentId) => {
   };
 };
 
+const joinClassByCode = async (userData, data) => {
+    validateFields(data, ["classCode"]);
+
+    const { userId } = userData;
+
+    // Verify student exists
+    const student = await Student.findById(userId);
+    if (!student) {
+        throw new ApiError(status.NOT_FOUND, "Student not found");
+    }
+
+    // Find class by code (must be active)
+    const classData = await Class.findOne({ 
+        classCode: data.classCode.toUpperCase(), // Normalize to uppercase
+        isActive: true 
+    });
+
+    if (!classData) {
+        throw new ApiError(status.NOT_FOUND, "Invalid class code or class not found");
+    }
+
+    // Check if class has reached maximum students
+    const activeStudents = classData.students.filter(s => s.status === 'active');
+    if (activeStudents.length >= classData.maxStudents) {
+        throw new ApiError(status.BAD_REQUEST, "Class has reached maximum student capacity");
+    }
+
+    // Check if student is already in class
+    const existingStudent = classData.students.find(
+        s => s.studentId.toString() === userId
+    );
+
+    if (existingStudent && existingStudent.status === 'active') {
+        throw new ApiError(status.BAD_REQUEST, "You are already enrolled in this class");
+    }
+
+    const session = await mongoose.startSession();
+    session.startTransaction();
+
+    try {
+        if (existingStudent && existingStudent.status === 'inactive') {
+            // Reactivate inactive student
+            await Class.updateOne(
+                { 
+                    _id: classData._id,
+                    "students.studentId": userId
+                },
+                { 
+                    $set: { "students.$.status": "active" },
+                    $set: { "students.$.joinedAt": new Date() }
+                },
+                { session }
+            );
+
+            // Reactivate student assignments
+            await StudentAssignment.updateMany(
+                {
+                    studentId: userId,
+                    classId: classData._id,
+                    status: "inactive"
+                },
+                { status: "not_started" },
+                { session }
+            );
+        } else {
+            // Add new student to class
+            await Class.updateOne(
+                { _id: classData._id },
+                { 
+                    $push: { 
+                        students: {
+                            studentId: userId,
+                            status: 'active',
+                            joinedAt: new Date()
+                        }
+                    }
+                },
+                { session }
+            );
+
+            // Assign all active assignments to this student
+            const activeAssignments = classData.assignments.filter(a => a.status === 'active');
+            
+            if (activeAssignments.length > 0) {
+                const studentAssignments = activeAssignments.map(assignment => ({
+                    studentId: userId,
+                    assignmentId: assignment.assignmentId,
+                    classId: classData._id,
+                    status: "not_started"
+                }));
+
+                await StudentAssignment.insertMany(studentAssignments, { session });
+            }
+        }
+
+        await session.commitTransaction();
+
+        // Send notification to student
+        try {
+            await postNotification(
+                "Successfully Joined Class",
+                `You have successfully joined the class "${classData.name}" using class code ${data.classCode}. Check your dashboard for new assignments.`,
+                userId
+            );
+        } catch (notificationError) {
+            console.error("Failed to send join notification:", notificationError);
+        }
+
+        // Return updated class info
+        const updatedClass = await Class.findById(classData._id)
+            .populate("teacherId", "firstName lastName email")
+            .lean();
+
+        return {
+            success: true,
+            message: `Successfully joined class "${classData.name}"`,
+            class: {
+                _id: updatedClass._id,
+                name: updatedClass.name,
+                classCode: updatedClass.classCode,
+                teacher: {
+                    firstName: updatedClass.teacherId.firstName,
+                    lastName: updatedClass.teacherId.lastName,
+                    email: updatedClass.teacherId.email
+                },
+                studentCount: updatedClass.students.filter(s => s.status === 'active').length,
+                assignmentCount: updatedClass.assignments.filter(a => a.status === 'active').length,
+                joinedAt: new Date()
+            }
+        };
+
+    } catch (error) {
+        await session.abortTransaction();
+        throw error;
+    } finally {
+        session.endSession();
+    }
+};
+
 const StudentService = {
   getProfile,
   deleteMyAccount,
@@ -331,6 +470,7 @@ const StudentService = {
   getStudentDetailsForAdmin,
   getMyAssignments,
   getAssignmentDetails,
+  joinClassByCode
 };
 
 module.exports = { StudentService };

@@ -43,6 +43,7 @@ router
     auth(config.auth_level.admin),
     StudentController.getAllStudents
   )
+  .post("/join", auth(config.auth_level.student), StudentController.joinClassByCode)
   .patch(
     "/update-block-unblock-student",
     auth(config.auth_level.admin),
