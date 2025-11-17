@@ -2,6 +2,7 @@ const express = require("express");
 const auth = require("../../middleware/auth");
 const { uploadFile } = require("../../middleware/fileUploader");
 const { CurriculumController } = require("./curriculum.controller");
+const { AnswerValidationController } = require("./answerValidation.controller");
 const config = require("../../../config");
 
 const router = express.Router();
@@ -42,5 +43,27 @@ router.patch(
   CurriculumController.updateQuestion
 );
 router.delete("/questions/:id", auth(config.auth_level.admin), CurriculumController.deleteQuestion);
+
+// Answer validation routes
+router.post(
+  "/answers/validate-single",
+  auth(config.auth_level.user),
+  AnswerValidationController.validateSingleAnswer
+);
+router.post(
+  "/answers/submit-assignment",
+  auth(config.auth_level.user),
+  AnswerValidationController.submitAndValidateAnswers
+);
+router.get(
+  "/answers/validation-details",
+  auth(config.auth_level.user),
+  AnswerValidationController.getAnswerValidationDetails
+);
+router.post(
+  "/answers/test-similarity",
+  auth(config.auth_level.admin),
+  AnswerValidationController.testAnswerSimilarity
+);
 
 module.exports = router;

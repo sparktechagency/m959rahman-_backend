@@ -574,57 +574,6 @@ const addAssignmentToClass = async (classId, data) => {
     return updatedAssignment;
 };
 
-// const removeAssignmentFromClass = async (classId, data) => {
-//     validateFields(data, ["assignmentId"]);
-
-//     if (!mongoose.Types.ObjectId.isValid(classId)) {
-//         throw new ApiError(status.BAD_REQUEST, "Invalid class ID");
-//     }
-
-//     const session = await mongoose.startSession();
-//     session.startTransaction();
-
-//     try {
-//         const classData = await Class.findById(classId).session(session);
-//         if (!classData) {
-//             throw new ApiError(status.NOT_FOUND, "Class not found");
-//         }
-
-//         // Remove assignment from class (soft delete)
-//         const assignmentIndex = classData.assignments.findIndex(
-//             a => a.assignmentId.toString() === data.assignmentId && a.status === 'active'
-//         );
-
-//         if (assignmentIndex === -1) {
-//             throw new ApiError(status.NOT_FOUND, "Assignment not found in this class");
-//         }
-
-//         classData.assignments[assignmentIndex].status = 'inactive';
-//         await classData.save({ session });
-
-//         // Remove this assignment from all students in the class
-//         await StudentAssignment.updateMany(
-//             {
-//                 assignmentId: data.assignmentId,
-//                 classId: classId
-//             },
-//             { status: "inactive" },
-//             { session }
-//         );
-
-//         await session.commitTransaction();
-
-//         return await Class.findById(classId)
-//             .populate("students.studentId", "firstName lastName email")
-//             .populate("assignments.assignmentId", "title assignmentCode");
-//     } catch (error) {
-//         await session.abortTransaction();
-//         throw error;
-//     } finally {
-//         session.endSession();
-//     }
-// };
-
 // Assign assignment to specific students in a class
 const assignAssignmentToStudents = async (classId, data) => {
     validateFields(data, ["assignmentId", "studentEmails"]);
@@ -1467,47 +1416,6 @@ const deleteAssignment = async (id) => {
     }
 };
 
-// const addQuestionsToAssignment = async (assignmentId, data) => {
-//     validateFields(data, ["questionIds"]);
-
-//     if (!mongoose.Types.ObjectId.isValid(assignmentId)) {
-//         throw new ApiError(status.BAD_REQUEST, "Invalid assignment ID");
-//     }
-
-//     const assignment = await Assignment.findById(assignmentId);
-//     if (!assignment) {
-//         throw new ApiError(status.NOT_FOUND, "Assignment not found");
-//     }
-
-//     // Get the questions and verify they belong to the same topic
-//     const questions = await Question.find({
-//         _id: { $in: data.questionIds },
-//         topicId: assignment.topicId,
-//         isActive: true,
-//     });
-
-//     if (questions.length !== data.questionIds.length) {
-//         throw new ApiError(status.BAD_REQUEST, "Some questions are not valid or don't belong to the assignment's topic");
-//     }
-
-//     // Add new questions (avoid duplicates)
-//     const newQuestionIds = data.questionIds.filter(
-//         id => !assignment.questions.includes(id)
-//     );
-
-//     if (newQuestionIds.length > 0) {
-//         assignment.questions.push(...newQuestionIds);
-//         await assignment.save();
-//     }
-
-//     return await assignment.populate([
-//         { path: "classId", select: "name classCode" },
-//         { path: "curriculumId", select: "name" },
-//         { path: "topicId", select: "name" },
-//         { path: "questions", select: "questionText questionImage partialMarks fullMarks" }
-//     ]);
-// };
-
 const addQuestionsToAssignment = async (assignmentId, data) => {
     validateFields(data, ["questionIds"]);
 
@@ -1528,41 +1436,6 @@ const addQuestionsToAssignment = async (assignmentId, data) => {
 
     return updatedAssignment;
 };
-
-// const removeQuestionsFromAssignment = async (assignmentId, data) => {
-//     validateFields(data, ["questionIds"]);
-
-//     if (!mongoose.Types.ObjectId.isValid(assignmentId)) {
-//         throw new ApiError(status.BAD_REQUEST, "Invalid assignment ID");
-//     }
-
-//     const assignment = await Assignment.findById(assignmentId);
-//     if (!assignment) {
-//         throw new ApiError(status.NOT_FOUND, "Assignment not found");
-//     }
-
-//     // Remove the questions
-//     assignment.questions = assignment.questions.filter(
-//         questionId => !data.questionIds.includes(questionId.toString())
-//     );
-
-//     // Recalculate total marks
-//     const remainingQuestions = await Question.find({
-//         _id: { $in: assignment.questions },
-//     });
-
-//     assignment.totalMarks = remainingQuestions.reduce((sum, question) => {
-//         return sum + (question.fullMarks?.mark || 0);
-//     }, 0);
-
-//     await assignment.save();
-
-//     return await assignment.populate([
-//         { path: "curriculumId", select: "name" },
-//         { path: "topicId", select: "name" },
-//         { path: "questions", select: "questionText questionImage partialMarks fullMarks" }
-//     ]);
-// };
 
 const removeQuestionsFromAssignment = async (assignmentId, data) => {
     validateFields(data, ["questionIds"]);
