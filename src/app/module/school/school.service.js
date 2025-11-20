@@ -639,7 +639,68 @@ const getAllSchools = async (query) => {
     teacherCountMap[item._id.toString()] = item.count;
   });
 
-  // Format the schools with comprehensive information
+  // Get teacher IDs for each school to find students
+  const schoolTeacherMap = {};
+  const allTeacherIds = [];
+  
+  // Get all school-teacher relationships
+  const schoolTeachers = await SchoolTeacher.find({ schoolId: { $in: schoolIds } })
+    .lean();
+  
+  // Organize teachers by school and collect all teacher IDs
+  schoolTeachers.forEach(relation => {
+    const schoolId = relation.schoolId.toString();
+    const teacherId = relation.teacherId;
+    
+    if (!schoolTeacherMap[schoolId]) {
+      schoolTeacherMap[schoolId] = [];
+    }
+    
+    schoolTeacherMap[schoolId].push(teacherId);
+    allTeacherIds.push(teacherId);
+  });
+  
+  // Get classes for all teachers across all schools
+  const classes = await Class.find({ teacherId: { $in: allTeacherIds } })
+    .select('_id teacherId students')
+    .lean();
+  
+  // Map classes to teachers
+  const teacherClassesMap = {};
+  classes.forEach(cls => {
+    const teacherId = cls.teacherId.toString();
+    if (!teacherClassesMap[teacherId]) {
+      teacherClassesMap[teacherId] = [];
+    }
+    teacherClassesMap[teacherId].push(cls);
+  });
+  
+  // Count unique students per school
+  const schoolStudentCountMap = {};
+  
+  // For each school, go through all its teachers' classes and count unique students
+  schoolIds.forEach(schoolId => {
+    const sId = schoolId.toString();
+    const teacherIds = schoolTeacherMap[sId] || [];
+    const uniqueStudents = new Set();
+    
+    teacherIds.forEach(teacherId => {
+      const tId = teacherId.toString();
+      const teacherClasses = teacherClassesMap[tId] || [];
+      
+      teacherClasses.forEach(cls => {
+        cls.students.forEach(student => {
+          if (student.status === 'active') {
+            uniqueStudents.add(student.studentId.toString());
+          }
+        });
+      });
+    });
+    
+    schoolStudentCountMap[sId] = uniqueStudents.size;
+  });
+
+  // Format the schools with comprehensive information including student counts
   const schools = schoolsRaw.map(school => {
     const schoolId = school._id.toString();
     
@@ -658,7 +719,10 @@ const getAllSchools = async (query) => {
         plan: school.subscription?.plan || 'basic',
         status: school.subscription?.status || 'inactive'
       },
-      teachersCount: teacherCountMap[schoolId] || 0,
+      statistics: {
+        teachersCount: teacherCountMap[schoolId] || 0,
+        studentsCount: schoolStudentCountMap[schoolId] || 0
+      },
       createdAt: school.createdAt,
       updatedAt: school.updatedAt
     };

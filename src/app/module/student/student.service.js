@@ -159,25 +159,56 @@ const getAllStudentsForAdmin = async (query) => {
   const studentIds = studentsRaw.map(student => student._id);
   
   // Get classes information for each student (which classes they are enrolled in)
-  const classEnrollments = await Class.aggregate([
-    { $match: { 'students.studentId': { $in: studentIds } } },
-    { $unwind: '$students' },
-    { $match: { 'students.studentId': { $in: studentIds } } },
-    { $group: {
-        _id: '$students.studentId',
-        classCount: { $sum: 1 },
-        classes: { $push: { classId: '$_id', className: '$name', status: '$students.status' } }
-      }
-    }
-  ]);
-  
-  // Create a map for quick lookup
+  const classes = await Class.find({ 'students.studentId': { $in: studentIds } })
+    .select('_id name subject grade teacherId students')
+    .populate({
+      path: 'teacherId',
+      select: 'firstname lastname email profile_image'
+    })
+    .lean();
+    
+  // Process class information with teacher details
   const classEnrollmentMap = {};
-  classEnrollments.forEach(item => {
-    classEnrollmentMap[item._id.toString()] = {
-      classCount: item.classCount,
-      classes: item.classes.slice(0, 5) // Limit to 5 classes for preview
+  
+  classes.forEach(cls => {
+    // Extract teacher information
+    const teacher = {
+      id: cls.teacherId?._id,
+      name: `${cls.teacherId?.firstname || ''} ${cls.teacherId?.lastname || ''}`.trim() || 'Unknown Teacher',
+      email: cls.teacherId?.email || '',
+      profile_image: cls.teacherId?.profile_image || null
     };
+    
+    // Find all students in this class
+    cls.students.forEach(student => {
+      if (!studentIds.some(id => id.toString() === student.studentId.toString())) {
+        return; // Skip if not in our target students
+      }
+      
+      const studentId = student.studentId.toString();
+      
+      if (!classEnrollmentMap[studentId]) {
+        classEnrollmentMap[studentId] = {
+          classCount: 0,
+          classes: []
+        };
+      }
+      
+      // Add class with teacher information
+      if (classEnrollmentMap[studentId].classes.length < 5) { // Limit to 5 classes for preview
+        classEnrollmentMap[studentId].classes.push({
+          classId: cls._id,
+          className: cls.name,
+          subject: cls.subject,
+          grade: cls.grade,
+          status: student.status,
+          enrolledAt: student.enrolledAt,
+          teacher: teacher
+        });
+      }
+      
+      classEnrollmentMap[studentId].classCount++;
+    });
   });
   
   // Get assignment completion statistics
