@@ -10,6 +10,8 @@ const unlinkFile = require("../../../util/unlinkFile");
 const QueryBuilder = require("../../../builder/queryBuilder");
 const Student = require("../student/Student");
 const Class = require("../class/Class");
+const Assignment = require("../class/Assignment");
+const SchoolTeacher = require("../school/SchoolTeacher");
 
 const getProfile = async (userData) => {
   const { userId, authId } = userData;
@@ -205,9 +207,13 @@ const getSubscriptionPlans = async () => {
 };
 
 const getAllTeachers = async (query) => {
+  // Create the base query with full populate for all related information
   const teacherQuery = new QueryBuilder(
     Teacher.find({})
-      .populate("authId", "email isVerified isBlocked isActive")
+      .populate({
+        path: "authId",
+        select: "firstName lastName email isVerified isBlocked isActive createdAt role"
+      })
       .lean(),
     query
   )
@@ -215,32 +221,138 @@ const getAllTeachers = async (query) => {
     .sort()
     .paginate();
 
-  const [teachers, meta] = await Promise.all([
+  const [teachersRaw, meta] = await Promise.all([
     teacherQuery.modelQuery,
     teacherQuery.countTotal(),
   ]);
 
-  // Add full name and format the response (summary view for list)
-  const formattedTeachers = teachers.map(teacher => ({
-    _id: teacher._id,
-    firstName: teacher.firstname,
-    lastName: teacher.lastname,
-    fullName: `${teacher.firstname} ${teacher.lastname}`,
-    email: teacher.email,
-    profile_image: teacher.profile_image,
-    specialization: teacher.specialization,
-    experience: teacher.experience,
-    subscription: {
-      plan: teacher.subscription?.plan,
-      status: teacher.subscription?.status,
-    },
-    auth: {
-      isVerified: teacher.authId?.isVerified,
-      isBlocked: teacher.authId?.isBlocked,
-      isActive: teacher.authId?.isActive,
-    },
-    createdAt: teacher.createdAt,
-  }));
+  // Get all teacher IDs
+  const teacherIds = teachersRaw.map(teacher => teacher._id);
+
+  // Get classes taught by these teachers
+  const classCounts = await Class.aggregate([
+    { $match: { teacherId: { $in: teacherIds } } },
+    { $group: { _id: "$teacherId", count: { $sum: 1 } } }
+  ]);
+  
+  // Create a map for quick lookup
+  const classCountMap = {};
+  classCounts.forEach(item => {
+    classCountMap[item._id.toString()] = item.count;
+  });
+  
+  // Count total students per teacher (unique students across all classes)
+  const teacherClassesMap = {};
+  
+  // First get all classes by teacher
+  const allClasses = await Class.find({ teacherId: { $in: teacherIds } })
+    .select('_id teacherId students')
+    .lean();
+    
+  // Group classes by teacher
+  allClasses.forEach(cls => {
+    const teacherId = cls.teacherId.toString();
+    if (!teacherClassesMap[teacherId]) {
+      teacherClassesMap[teacherId] = [];
+    }
+    teacherClassesMap[teacherId].push(cls);
+  });
+  
+  // Count unique students per teacher
+  const studentCountMap = {};
+  Object.keys(teacherClassesMap).forEach(teacherId => {
+    const classes = teacherClassesMap[teacherId];
+    const uniqueStudents = new Set();
+    classes.forEach(cls => {
+      cls.students.forEach(student => {
+        if (student.status === 'active') {
+          uniqueStudents.add(student.studentId.toString());
+        }
+      });
+    });
+    studentCountMap[teacherId] = uniqueStudents.size;
+  });
+  
+  // Get assignments created by each teacher
+  const assignmentCounts = await Assignment.aggregate([
+    { $match: { teacherId: { $in: teacherIds } } },
+    { $group: { _id: "$teacherId", count: { $sum: 1 } } }
+  ]);
+  
+  // Create a map for quick lookup
+  const assignmentCountMap = {};
+  assignmentCounts.forEach(item => {
+    assignmentCountMap[item._id.toString()] = item.count;
+  });
+  
+  // Get schools associated with each teacher
+  const schoolTeachers = await SchoolTeacher.find({ teacherId: { $in: teacherIds } })
+    .populate({
+      path: 'schoolId',
+      select: 'firstName lastName email profile_image'
+    })
+    .lean();
+  
+  // Group schools by teacher
+  const teacherSchoolsMap = {};
+  schoolTeachers.forEach(relation => {
+    const teacherId = relation.teacherId.toString();
+    if (!teacherSchoolsMap[teacherId]) {
+      teacherSchoolsMap[teacherId] = [];
+    }
+    
+    if (relation.schoolId) {
+      teacherSchoolsMap[teacherId].push({
+        schoolId: relation.schoolId._id,
+        name: `${relation.schoolId.firstName || ''} ${relation.schoolId.lastName || ''}`.trim() || 'Unknown School',
+        email: relation.schoolId.email || '',
+        profile_image: relation.schoolId.profile_image || null,
+        status: relation.status,
+        joinedAt: relation.joinedAt
+      });
+    }
+  });
+
+  // Format the teachers with comprehensive information
+  const formattedTeachers = teachersRaw.map(teacher => {
+    const teacherId = teacher._id.toString();
+    
+    return {
+      _id: teacher._id,
+      authId: teacher.authId?._id,
+      firstName: teacher.firstname || teacher.authId?.firstName || '',
+      lastName: teacher.lastname || teacher.authId?.lastName || '',
+      fullName: `${teacher.firstname || teacher.authId?.firstName || ''} ${teacher.lastname || teacher.authId?.lastName || ''}`.trim(),
+      email: teacher.email || teacher.authId?.email || '',
+      profile_image: teacher.profile_image || null,
+      phoneNumber: teacher.phoneNumber || '',
+      isBlocked: teacher.isBlocked || false,
+      bio: teacher.bio || '',
+      specialization: teacher.specialization || '',
+      experience: teacher.experience || '',
+      qualifications: teacher.qualifications || [],
+      subscription: {
+        plan: teacher.subscription?.plan || 'free',
+        status: teacher.subscription?.status || 'inactive',
+        validUntil: teacher.subscription?.validUntil || null
+      },
+      auth: {
+        isVerified: teacher.authId?.isVerified || false,
+        isBlocked: teacher.authId?.isBlocked || false,
+        isActive: teacher.authId?.isActive || false,
+        role: teacher.authId?.role || ''
+      },
+      statistics: {
+        classesCount: classCountMap[teacherId] || 0,
+        studentsCount: studentCountMap[teacherId] || 0,
+        assignmentsCount: assignmentCountMap[teacherId] || 0,
+        schoolsCount: (teacherSchoolsMap[teacherId] || []).length
+      },
+      schools: teacherSchoolsMap[teacherId] || [],
+      createdAt: teacher.createdAt,
+      updatedAt: teacher.updatedAt
+    };
+  });
 
   return {
     meta,
@@ -253,41 +365,157 @@ const getTeacherById = async (id) => {
     throw new ApiError(status.BAD_REQUEST, "Invalid teacher ID");
   }
 
+  // Get comprehensive teacher information
   const teacher = await Teacher.findById(id)
-    .populate("authId", "email isVerified isBlocked isActive createdAt updatedAt")
+    .populate({
+      path: "authId",
+      select: "firstName lastName email isVerified isBlocked isActive role createdAt updatedAt"
+    })
     .lean();
 
   if (!teacher) {
     throw new ApiError(status.NOT_FOUND, "Teacher not found");
   }
 
-  // Format the response
+  // Get classes taught by this teacher with details
+  const classes = await Class.find({ teacherId: id })
+    .select('_id name subject grade description createdAt students')
+    .lean();
+  
+  // Count total unique students
+  const uniqueStudents = new Set();
+  const activeStudentsByClass = {};
+  
+  classes.forEach(cls => {
+    activeStudentsByClass[cls._id.toString()] = 0;
+    
+    cls.students.forEach(student => {
+      if (student.status === 'active') {
+        uniqueStudents.add(student.studentId.toString());
+        activeStudentsByClass[cls._id.toString()]++;
+      }
+    });
+  });
+  
+  // Format classes with student counts
+  const formattedClasses = classes.map(cls => ({
+    _id: cls._id,
+    name: cls.name,
+    subject: cls.subject,
+    grade: cls.grade,
+    description: cls.description,
+    activeStudentsCount: activeStudentsByClass[cls._id.toString()] || 0,
+    totalStudentsCount: cls.students.length,
+    createdAt: cls.createdAt
+  }));
+
+  // Get assignments created by this teacher
+  const assignments = await Assignment.find({ teacherId: id })
+    .select('_id title description dueDate classId submissions createdAt')
+    .populate({
+      path: 'classId',
+      select: '_id name subject'
+    })
+    .lean();
+  
+  // Format assignments with submission statistics
+  const formattedAssignments = assignments.map(assignment => {
+    // Count submissions by status
+    const submissionStats = {
+      total: assignment.submissions.length,
+      completed: 0,
+      pending: 0,
+      late: 0
+    };
+    
+    assignment.submissions.forEach(sub => {
+      if (sub.status === 'completed') submissionStats.completed++;
+      else if (sub.status === 'pending') submissionStats.pending++;
+      else if (sub.status === 'late') submissionStats.late++;
+    });
+    
+    return {
+      _id: assignment._id,
+      title: assignment.title,
+      description: assignment.description,
+      dueDate: assignment.dueDate,
+      class: {
+        _id: assignment.classId?._id,
+        name: assignment.classId?.name || '',
+        subject: assignment.classId?.subject || ''
+      },
+      submissionStats,
+      createdAt: assignment.createdAt
+    };
+  });
+  
+  // Get schools associated with this teacher
+  const schoolTeachers = await SchoolTeacher.find({ teacherId: id })
+    .populate({
+      path: 'schoolId',
+      select: '_id firstName lastName email profile_image address subscription'
+    })
+    .lean();
+  
+  // Format school associations
+  const schools = schoolTeachers.map(relation => ({
+    relationId: relation._id,
+    schoolId: relation.schoolId?._id,
+    name: `${relation.schoolId?.firstName || ''} ${relation.schoolId?.lastName || ''}`.trim() || 'Unknown School',
+    email: relation.schoolId?.email || '',
+    profile_image: relation.schoolId?.profile_image || null,
+    address: relation.schoolId?.address || '',
+    subscription: {
+      plan: relation.schoolId?.subscription?.plan || 'basic',
+      status: relation.schoolId?.subscription?.status || 'inactive'
+    },
+    status: relation.status,
+    joinedAt: relation.joinedAt
+  }));
+
+  // Format the comprehensive teacher profile
   const formattedTeacher = {
     _id: teacher._id,
-    firstName: teacher.firstname,
-    lastName: teacher.lastname,
-    fullName: `${teacher.firstname} ${teacher.lastname}`,
-    email: teacher.email,
-    profile_image: teacher.profile_image,
-    phoneNumber: teacher.phoneNumber,
-    dateOfBirth: teacher.dateOfBirth,
-    address: teacher.address,
-    bio: teacher.bio,
-    specialization: teacher.specialization,
-    experience: teacher.experience,
-    qualifications: teacher.qualifications,
-    subscription: teacher.subscription,
-    auth: {
-      _id: teacher.authId?._id,
-      email: teacher.authId?.email,
-      isVerified: teacher.authId?.isVerified,
-      isBlocked: teacher.authId?.isBlocked,
-      isActive: teacher.authId?.isActive,
-      createdAt: teacher.authId?.createdAt,
-      updatedAt: teacher.authId?.updatedAt,
+    authId: teacher.authId?._id,
+    firstName: teacher.firstname || teacher.authId?.firstName || '',
+    lastName: teacher.lastname || teacher.authId?.lastName || '',
+    fullName: `${teacher.firstname || teacher.authId?.firstName || ''} ${teacher.lastname || teacher.authId?.lastName || ''}`.trim(),
+    email: teacher.email || teacher.authId?.email || '',
+    profile_image: teacher.profile_image || null,
+    phoneNumber: teacher.phoneNumber || '',
+    dateOfBirth: teacher.dateOfBirth || null,
+    address: teacher.address || '',
+    bio: teacher.bio || '',
+    specialization: teacher.specialization || '',
+    experience: teacher.experience || '',
+    isBlocked: teacher.isBlocked || false,
+    qualifications: teacher.qualifications || [],
+    subscription: {
+      plan: teacher.subscription?.plan || 'free',
+      status: teacher.subscription?.status || 'inactive',
+      validUntil: teacher.subscription?.validUntil || null
     },
+    auth: {
+      isVerified: teacher.authId?.isVerified || false,
+      isBlocked: teacher.authId?.isBlocked || false,
+      isActive: teacher.authId?.isActive || false,
+      role: teacher.authId?.role || '',
+      createdAt: teacher.authId?.createdAt,
+      updatedAt: teacher.authId?.updatedAt
+    },
+    statistics: {
+      classesCount: classes.length,
+      studentsCount: uniqueStudents.size,
+      assignmentsCount: assignments.length,
+      schoolsCount: schools.length,
+      completedAssignments: assignments.reduce((total, a) => total + a.submissionStats.completed, 0),
+      pendingAssignments: assignments.reduce((total, a) => total + a.submissionStats.pending, 0)
+    },
+    classes: formattedClasses,
+    assignments: formattedAssignments,
+    schools: schools,
     createdAt: teacher.createdAt,
-    updatedAt: teacher.updatedAt,
+    updatedAt: teacher.updatedAt
   };
 
   return formattedTeacher;

@@ -134,26 +134,109 @@ const updateBlockUnblockStudent = async (studentData, payload) => {
 
 // Get all students for admin with pagination and search
 const getAllStudentsForAdmin = async (query) => {
+  // Create query with full populate for all related information
   const studentQuery = new QueryBuilder(
     Student.find()
       .populate({
         path: 'authId',
-        select: 'name email phoneNumber role isActive',
+        select: 'firstName lastName email phoneNumber role isActive createdAt'
       })
-      .select('-__v -createdAt -updatedAt')
       .lean(),
     query
   )
-    .search(['name', 'email', 'studentId'])
+    .search(['firstName', 'lastName', 'email', 'studentId'])
     .filter()
     .sort()
     .paginate()
     .fields();
 
-  const [students, meta] = await Promise.all([
+  const [studentsRaw, meta] = await Promise.all([
     studentQuery.modelQuery,
     studentQuery.countTotal(),
   ]);
+
+  // Get all student IDs
+  const studentIds = studentsRaw.map(student => student._id);
+  
+  // Get classes information for each student (which classes they are enrolled in)
+  const classEnrollments = await Class.aggregate([
+    { $match: { 'students.studentId': { $in: studentIds } } },
+    { $unwind: '$students' },
+    { $match: { 'students.studentId': { $in: studentIds } } },
+    { $group: {
+        _id: '$students.studentId',
+        classCount: { $sum: 1 },
+        classes: { $push: { classId: '$_id', className: '$name', status: '$students.status' } }
+      }
+    }
+  ]);
+  
+  // Create a map for quick lookup
+  const classEnrollmentMap = {};
+  classEnrollments.forEach(item => {
+    classEnrollmentMap[item._id.toString()] = {
+      classCount: item.classCount,
+      classes: item.classes.slice(0, 5) // Limit to 5 classes for preview
+    };
+  });
+  
+  // Get assignment completion statistics
+  const assignmentStats = await Assignment.aggregate([
+    { $match: { 'submissions.studentId': { $in: studentIds } } },
+    { $unwind: '$submissions' },
+    { $match: { 'submissions.studentId': { $in: studentIds } } },
+    { $group: {
+        _id: '$submissions.studentId',
+        totalAssignments: { $sum: 1 },
+        completedAssignments: { $sum: { $cond: [{ $eq: ['$submissions.status', 'completed'] }, 1, 0] } }
+      }
+    }
+  ]);
+  
+  // Create a map for quick lookup
+  const assignmentStatsMap = {};
+  assignmentStats.forEach(item => {
+    assignmentStatsMap[item._id.toString()] = {
+      totalAssignments: item.totalAssignments,
+      completedAssignments: item.completedAssignments,
+      completionRate: item.totalAssignments > 0 ? 
+        Math.round((item.completedAssignments / item.totalAssignments) * 100) : 0
+    };
+  });
+
+  // Format students with all information
+  const students = studentsRaw.map(student => {
+    const studentId = student._id.toString();
+    const enrollmentInfo = classEnrollmentMap[studentId] || { classCount: 0, classes: [] };
+    const assignmentInfo = assignmentStatsMap[studentId] || 
+      { totalAssignments: 0, completedAssignments: 0, completionRate: 0 };
+    
+    return {
+      _id: student._id,
+      authId: student.authId?._id,
+      firstName: student.firstName || student.authId?.firstName || '',
+      lastName: student.lastName || student.authId?.lastName || '',
+      fullName: `${student.firstName || student.authId?.firstName || ''} ${student.lastName || student.authId?.lastName || ''}`.trim(),
+      email: student.email || student.authId?.email || '',
+      phoneNumber: student.phoneNumber || student.authId?.phoneNumber || '',
+      profile_image: student.profile_image || null,
+      studentId: student.studentId || '',
+      isBlocked: student.isBlocked || false,
+      grade: student.grade || '',
+      dateOfBirth: student.dateOfBirth || null,
+      gender: student.gender || '',
+      address: student.address || '',
+      parentInfo: student.parentInfo || null,
+      academicInfo: student.academicInfo || null,
+      classEnrollment: {
+        count: enrollmentInfo.classCount,
+        classes: enrollmentInfo.classes
+      },
+      assignments: assignmentInfo,
+      createdAt: student.createdAt,
+      updatedAt: student.updatedAt
+    };
+  });
 
   return {
     meta,
@@ -167,19 +250,115 @@ const getStudentDetailsForAdmin = async (studentId) => {
     throw new ApiError(status.BAD_REQUEST, 'Invalid student ID');
   }
 
+  // Get comprehensive student information
   const student = await Student.findById(studentId)
     .populate({
       path: 'authId',
-      select: 'name email phoneNumber role isActive',
+      select: 'firstName lastName email phoneNumber role isActive createdAt'
     })
-    .select('-__v -createdAt -updatedAt')
     .lean();
 
   if (!student) {
     throw new ApiError(status.NOT_FOUND, 'Student not found');
   }
 
-  return student;
+  // Get class enrollments for this student
+  const classEnrollments = await Class.find({ 'students.studentId': studentId })
+    .select('_id name description subject grade teacherId students')
+    .populate({
+      path: 'teacherId',
+      select: 'firstname lastname email profile_image'
+    })
+    .lean();
+  
+  // Format class enrollments with student-specific status
+  const classes = classEnrollments.map(cls => {
+    const studentEntry = cls.students.find(
+      s => s.studentId.toString() === studentId.toString()
+    );
+    
+    return {
+      classId: cls._id,
+      name: cls.name,
+      subject: cls.subject,
+      grade: cls.grade,
+      description: cls.description,
+      teacher: {
+        id: cls.teacherId?._id,
+        name: `${cls.teacherId?.firstname || ''} ${cls.teacherId?.lastname || ''}`.trim() || 'Unknown Teacher',
+        email: cls.teacherId?.email || '',
+        profile_image: cls.teacherId?.profile_image || null
+      },
+      enrollmentStatus: studentEntry?.status || 'unknown',
+      enrollmentDate: studentEntry?.enrolledAt || null,
+      totalStudents: cls.students.length
+    };
+  });
+  
+  // Get assignment submissions for this student
+  const assignments = await Assignment.find({ 'submissions.studentId': studentId })
+    .select('_id title description dueDate classId submissions')
+    .populate({
+      path: 'classId',
+      select: 'name subject'
+    })
+    .lean();
+  
+  // Format assignment information with submission details
+  const formattedAssignments = assignments.map(assignment => {
+    const submission = assignment.submissions.find(
+      s => s.studentId.toString() === studentId.toString()
+    );
+    
+    return {
+      assignmentId: assignment._id,
+      title: assignment.title,
+      description: assignment.description,
+      dueDate: assignment.dueDate,
+      class: {
+        id: assignment.classId?._id,
+        name: assignment.classId?.name || '',
+        subject: assignment.classId?.subject || ''
+      },
+      submission: submission ? {
+        status: submission.status,
+        submittedAt: submission.submittedAt,
+        grade: submission.grade,
+        feedback: submission.feedback,
+        attachments: submission.attachments || []
+      } : null
+    };
+  });
+
+  // Format comprehensive response
+  return {
+    _id: student._id,
+    authId: student.authId?._id,
+    firstName: student.firstName || student.authId?.firstName || '',
+    lastName: student.lastName || student.authId?.lastName || '',
+    fullName: `${student.firstName || student.authId?.firstName || ''} ${student.lastName || student.authId?.lastName || ''}`.trim(),
+    email: student.email || student.authId?.email || '',
+    phoneNumber: student.phoneNumber || student.authId?.phoneNumber || '',
+    profile_image: student.profile_image || null,
+    studentId: student.studentId || '',
+    isBlocked: student.isBlocked || false,
+    grade: student.grade || '',
+    dateOfBirth: student.dateOfBirth || null,
+    gender: student.gender || '',
+    address: student.address || '',
+    parentInfo: student.parentInfo || null,
+    academicInfo: student.academicInfo || null,
+    statistics: {
+      totalClasses: classes.length,
+      totalAssignments: formattedAssignments.length,
+      completedAssignments: formattedAssignments.filter(a => a.submission?.status === 'completed').length,
+      pendingAssignments: formattedAssignments.filter(a => a.submission?.status === 'pending').length
+    },
+    classes: classes,
+    assignments: formattedAssignments,
+    createdAt: student.createdAt,
+    updatedAt: student.updatedAt
+  };
 };
 
 // Get all assignments assigned to the authenticated student

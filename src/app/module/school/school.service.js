@@ -602,9 +602,15 @@ const getMySchoolProfile = async (userId) => {
   };
 };
 
-const getAllSchools = async (schoolData, query) => {
+const getAllSchools = async (query) => {
+  // Create the base query with full populate for all related information
   const schoolQuery = new QueryBuilder(
-    School.find({}).populate("authId").lean(),
+    School.find({})
+      .populate({
+        path: "authId",
+        select: "firstName lastName email role createdAt"
+      })
+      .lean(),
     query
   )
     .search(["firstName", "lastName", "email"])
@@ -613,10 +619,50 @@ const getAllSchools = async (schoolData, query) => {
     .paginate()
     .fields();
 
-  const [schools, meta] = await Promise.all([
+  const [schoolsRaw, meta] = await Promise.all([
     schoolQuery.modelQuery,
     schoolQuery.countTotal(),
   ]);
+
+  // Get additional information for each school
+  const schoolIds = schoolsRaw.map(school => school._id);
+
+  // Count teachers for each school
+  const teacherCounts = await SchoolTeacher.aggregate([
+    { $match: { schoolId: { $in: schoolIds } } },
+    { $group: { _id: "$schoolId", count: { $sum: 1 } } }
+  ]);
+
+  // Create a map of teacher counts for quick lookup
+  const teacherCountMap = {};
+  teacherCounts.forEach(item => {
+    teacherCountMap[item._id.toString()] = item.count;
+  });
+
+  // Format the schools with comprehensive information
+  const schools = schoolsRaw.map(school => {
+    const schoolId = school._id.toString();
+    
+    return {
+      _id: school._id,
+      authId: school.authId?._id,
+      firstName: school.firstName || school.authId?.firstName || '',
+      lastName: school.lastName || school.authId?.lastName || '',
+      fullName: `${school.firstName || school.authId?.firstName || ''} ${school.lastName || school.authId?.lastName || ''}`.trim(),
+      email: school.email,
+      profile_image: school.profile_image,
+      phoneNumber: school.phoneNumber || '',
+      address: school.address || '',
+      isBlocked: school.isBlocked || false,
+      subscription: {
+        plan: school.subscription?.plan || 'basic',
+        status: school.subscription?.status || 'inactive'
+      },
+      teachersCount: teacherCountMap[schoolId] || 0,
+      createdAt: school.createdAt,
+      updatedAt: school.updatedAt
+    };
+  });
 
   return {
     meta,
@@ -629,12 +675,11 @@ const getSchoolDetails = async (schoolId) => {
     throw new ApiError(status.BAD_REQUEST, "Invalid school ID");
   }
 
-  // Find school by ID
+  // Find school by ID with all relevant information
   const school = await School.findById(schoolId)
-    .select('_id authId firstName lastName email profile_image phoneNumber address subscription')
     .populate({
       path: 'authId',
-      select: 'firstName lastName email role'
+      select: 'firstName lastName email role createdAt'
     })
     .lean();
 
@@ -642,19 +687,57 @@ const getSchoolDetails = async (schoolId) => {
     throw new ApiError(status.NOT_FOUND, "School not found");
   }
 
-  // Format the response
+  // Get teacher count for this school
+  const teacherCount = await SchoolTeacher.countDocuments({ schoolId });
+  
+  // Get all teacher IDs in this school
+  const teacherRelations = await SchoolTeacher.find({ schoolId });
+  const teacherIds = teacherRelations.map(relation => relation.teacherId);
+  
+  // Count classes in this school
+  const classCount = await Class.countDocuments({ teacherId: { $in: teacherIds } });
+  
+  // Get student count (unique students across all classes)
+  const classes = await Class.find({ teacherId: { $in: teacherIds } });
+  const studentSet = new Set();
+  classes.forEach(cls => {
+    cls.students.forEach(student => {
+      if (student.status === 'active') {
+        studentSet.add(student.studentId.toString());
+      }
+    });
+  });
+  const studentCount = studentSet.size;
+
+  // Get assignments count
+  const assignmentCount = await Assignment.countDocuments({ 
+    classId: { $in: classes.map(cls => cls._id) } 
+  });
+
+  // Format the response with all details
   return {
     _id: school._id,
+    authId: school.authId?._id,
     firstName: school.firstName || school.authId?.firstName || '',
     lastName: school.lastName || school.authId?.lastName || '',
+    fullName: `${school.firstName || school.authId?.firstName || ''} ${school.lastName || school.authId?.lastName || ''}`.trim(),
     email: school.email,
     profile_image: school.profile_image,
     phoneNumber: school.phoneNumber || '',
     address: school.address || '',
+    isBlocked: school.isBlocked || false,
     subscription: {
       plan: school.subscription?.plan || 'basic',
       status: school.subscription?.status || 'inactive'
-    }
+    },
+    statistics: {
+      teacherCount,
+      classCount,
+      studentCount,
+      assignmentCount
+    },
+    createdAt: school.createdAt,
+    updatedAt: school.updatedAt
   };
 };
 
