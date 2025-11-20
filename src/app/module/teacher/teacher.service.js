@@ -437,8 +437,15 @@ const getAllStudentsForTeacher = async (userData, query) => {
   };
 };
 
-
-
+const blockUnblockTeacher = async (id, isBlocked) => {
+  const teacher = await Teacher.findById(id);
+  if (!teacher) {
+    throw new ApiError(status.NOT_FOUND, "Teacher not found");
+  }
+  teacher.isBlocked = isBlocked;
+  await teacher.save();
+  return teacher;
+};
 
 
 
@@ -452,7 +459,8 @@ const TeacherService = {
   getSubscriptionPlans,
   getAllTeachers,
   getTeacherById,
-  getAllStudentsForTeacher
+  getAllStudentsForTeacher,
+  blockUnblockTeacher
 };
 
 module.exports = { TeacherService };

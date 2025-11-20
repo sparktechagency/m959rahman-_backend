@@ -3,6 +3,7 @@ const sendResponse = require("../../../util/sendResponse");
 const catchAsync = require("../../../util/catchAsync");
 const config = require("../../../config");
 
+
 const registrationAccount = catchAsync(async (req, res) => {
   const result = await AuthService.registrationAccount(req.body);
 
@@ -13,6 +14,25 @@ const registrationAccount = catchAsync(async (req, res) => {
     statusCode: isSuccess ? 200 : 400,
     success: isSuccess,
     message: result.message || "Something went wrong",
+    data: result,
+  });
+});
+
+const socialSignIn = catchAsync(async (req, res) => {
+  // Expect idToken and optional role in body
+  const result = await AuthService.socialLogin(req.body);
+
+  const { refreshToken } = result;
+  const cookieOptions = {
+    secure: config.env === "production",
+    httpOnly: true,
+  };
+  res.cookie("refreshToken", refreshToken, cookieOptions);
+
+  sendResponse(res, {
+    statusCode: 200,
+    success: true,
+    message: "Logged in via social provider",
     data: result,
   });
 });
@@ -107,6 +127,7 @@ const AuthController = {
   resetPassword,
   forgetPassOtpVerify,
   resendActivationCode,
+  socialSignIn,
 };
 
 module.exports = { AuthController };

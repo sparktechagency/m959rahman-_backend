@@ -32,6 +32,26 @@ const AuthSchema = new Schema(
       enum: ["STUDENT", "SCHOOL", "TEACHER", "ADMIN", "SUPER_ADMIN"],
       required: true,
     },
+    firebaseUid: {
+      type: String,
+      index: true,
+      sparse: true,
+    },
+    providers: {
+      // e.g. ['password', 'google', 'facebook', 'microsoft']
+      type: [String],
+      default: [],
+    },
+    // Store provider-specific user IDs
+    socialProviderIds: {
+      type: Map,
+      of: String,
+      default: new Map()
+    },
+    // optionally store displayName
+    displayName: { type: String },
+    // Profile picture from social providers
+    profilePicture: { type: String },
     isVerified: {
       type: Boolean,
     },

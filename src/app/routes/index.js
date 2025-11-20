@@ -7,6 +7,7 @@ const UserRoutes = require("../module/user/user.routes");
 const CurriculumRoutes = require("../module/curriculum/curriculum.routes");
 const StudentRoutes = require("../module/student/student.routes");
 const TeacherRoutes = require("../module/teacher/teacher.routes");
+const SchoolRoutes = require("../module/school/school.routes");
 // const PhoneVerificationRoutes = require("../module/phoneVerification/phon  eVerification.routes");
 // const DashboardRoutes = require("../module/dashboard/dashboard.routes");
 const NotificationRoutes = require("../module/notification/notification.routes");
@@ -51,6 +52,10 @@ const moduleRoutes = [
   {
     path: "/teacher",
     route: TeacherRoutes,
+  },
+  {
+    path: "/school",
+    route: SchoolRoutes,
   },
   {
     path: "/class",

@@ -1,17 +1,18 @@
 const mongoose = require("mongoose");
+
 const { Schema, model } = mongoose;
 
-const TeacherSchema = new Schema(
+const SchoolSchema = new Schema(
   {
     authId: {
       type: Schema.Types.ObjectId,
       required: true,
       ref: "Auth",
     },
-    firstname: {
+    firstName: {
       type: String,
     },
-    lastname: {
+    lastName: {
       type: String,
     },
     email: {
@@ -20,36 +21,17 @@ const TeacherSchema = new Schema(
     },
     profile_image: {
       type: String,
+      default: null,
     },
     phoneNumber: {
-      type: String,
-    },
-    dateOfBirth: {
       type: String,
     },
     address: {
       type: String,
     },
-    bio: {
-      type: String,
-      trim: true,
-    },
-    specialization: {
-      type: String,
-      trim: true,
-    },
     isBlocked: {
       type: Boolean,
       default: false,
-    },
-    qualifications: [{
-      degree: String,
-      institution: String,
-      year: Number
-    }],
-    experience: {
-      type: Number, // in years
-      default: 0,
     },
     subscription: {
       plan: {
@@ -82,6 +64,6 @@ const TeacherSchema = new Schema(
   }
 );
 
-const Teacher = model("Teacher", TeacherSchema);
+const School = model("School", SchoolSchema);
 
-module.exports = Teacher;
+module.exports = School;

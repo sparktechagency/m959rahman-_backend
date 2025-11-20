@@ -15,7 +15,11 @@ const validateFields = require("../../../util/validateFields");
 const EmailHelpers = require("../../../util/emailHelpers");
 const Admin = require("../admin/Admin");
 const Teacher = require("../teacher/Teacher");
+const School = require("../school/School");
 const postNotification = require("../../../util/postNotification");
+const Class = require("../class/Class");
+const admin = require("../../../util/firbaseAdmin");
+const SocialAuthProviders = require("../../../util/socialAuthProviders");
 
 
 
@@ -84,6 +88,9 @@ const registrationAccount = async (payload) => {
   if (role === EnumUserRole.TEACHER)
     EmailHelpers.sendActivationEmail(email, data);
 
+  if (role === EnumUserRole.SCHOOL)
+    EmailHelpers.sendActivationEmail(email, data);
+
   const auth = await Auth.create(authData);
 
   const userData = {
@@ -107,6 +114,9 @@ const registrationAccount = async (payload) => {
     case EnumUserRole.TEACHER:
       await Teacher.create(userData);
       break;
+    case EnumUserRole.SCHOOL:
+      await School.create(userData);
+      break;      
     default:
       throw new ApiError(status.BAD_REQUEST, "Invalid role. But auth created");
   }
@@ -176,6 +186,10 @@ const activateAccount = async (payload) => {
       result = await Teacher.findOne({ authId: auth._id }).lean();
       console.log(result)
       break;
+    case EnumUserRole.SCHOOL:
+      result = await School.findOne({ authId: auth._id }).lean();
+      console.log(result)
+      break;
     default:
       result = await Auth.findOne({ authId: auth._id }).lean();
   }
@@ -210,9 +224,19 @@ const activateAccount = async (payload) => {
     config.jwt.refresh_expires_in
   );
 
+  // Check if student is in any class and include this information
+  let classMembershipInfo = {};
+  if (auth.role === EnumUserRole.STUDENT) {
+    classMembershipInfo = await checkStudentClassMembership(result._id);
+  }
+
   return {
     accessToken,
     refreshToken,
+    user: {
+      ...result,
+      ...classMembershipInfo
+    }
   };
 };
 
@@ -259,10 +283,20 @@ const loginAccount = async (payload) => {
         .populate("authId")
         .lean();
       break;
+    case EnumUserRole.SCHOOL:
+      result = await School.findOne({ authId: auth._id })
+        .populate("authId")
+        .lean();
+      break;
     default:
       result = await Auth.findOne({ authId: auth._id })
         .populate("authId")
         .lean();
+  }
+
+  // Check if result exists
+  if (!result) {
+    throw new ApiError(status.INTERNAL_SERVER_ERROR, "Profile data not found. Please contact support.");
   }
 
   const tokenPayload = {
@@ -278,8 +312,17 @@ const loginAccount = async (payload) => {
     config.jwt.expires_in
   );
 
+  // Check if student is in any class and include this information
+  let classMembershipInfo = {};
+  if (auth.role === EnumUserRole.STUDENT) {
+    classMembershipInfo = await checkStudentClassMembership(result._id);
+  }
+
   return {
-    user: result,
+    user: {
+      ...result,
+      ...classMembershipInfo
+    },
     accessToken,
   };
 };
@@ -429,6 +472,224 @@ const hashPass = async (newPassword) => {
   return await bcrypt.hash(newPassword, Number(config.bcrypt_salt_rounds));
 };
 
+const verifyFirebaseIdToken = async (idToken) => {
+  try {
+    // For development, accept any valid-looking token
+    // In production, this should verify the actual Firebase token
+    if (!idToken || typeof idToken !== 'string') {
+      throw new Error('Invalid token format');
+    }
+    
+    // Mock decoded token for development - replace with real Firebase verification in production
+    const mockDecodedToken = {
+      uid: 'dev-user-' + Math.random().toString(36).substr(2, 9),
+      email: 'dev-user@example.com',
+      name: 'Development User',
+      firebase: {
+        sign_in_provider: 'google.com' // or 'facebook.com'
+      }
+    };
+    
+    return mockDecodedToken;
+  } catch (error) {
+    throw new ApiError(status.UNAUTHORIZED, "Invalid social auth token");
+  }
+};
+
+const checkStudentClassMembership = async (studentId) => {
+  try {
+    const classes = await Class.find({
+      'students.studentId': studentId,
+      'students.status': 'active',
+      isActive: true
+    }).select('_id name classCode').lean();
+    
+    return {
+      isInClass: classes.length > 0,
+      classCount: classes.length,
+      classes: classes.map(cls => ({
+        classId: cls._id,
+        className: cls.name,
+        classCode: cls.classCode
+      }))
+    };
+  } catch (error) {
+    logger.error('Error checking student class membership:', error);
+    return {
+      isInClass: false,
+      classCount: 0,
+      classes: []
+    };
+  }
+};
+
+
+const socialLogin = async (payload) => {
+  const { accessToken, provider, role } = payload;
+  
+  // Validate required fields
+  if (!accessToken) {
+    throw new ApiError(status.BAD_REQUEST, "Access token is required");
+  }
+  if (!provider) {
+    throw new ApiError(status.BAD_REQUEST, "Provider is required");
+  }
+
+  // Validate token with the respective provider and get user data
+  const userData = await SocialAuthProviders.validateProviderToken(provider, accessToken);
+  
+  const { email, name, firstName, lastName, picture, providerId } = userData;
+  
+  // Find or create user by email
+  let auth = await Auth.findOne({ email });
+  
+  if (auth) {
+    // Update existing user
+    if (auth.isBlocked) {
+      throw new ApiError(status.FORBIDDEN, "Account blocked. Contact support");
+    }
+    
+    // Ensure providers array contains provider
+    const providers = new Set(auth.providers || []);
+    providers.add(provider);
+    auth.providers = Array.from(providers);
+    
+    // Update social provider ID if not exists
+    if (!auth.socialProviderIds) auth.socialProviderIds = {};
+    auth.socialProviderIds[provider] = providerId;
+    
+    if (!auth.isActive) auth.isActive = true;
+    if (!auth.displayName && name) auth.displayName = name;
+    if (picture && !auth.profilePicture) auth.profilePicture = picture;
+    
+    await auth.save();
+  } else {
+    // Create new user
+    const newAuthData = {
+      firstName: firstName || name?.split(' ')[0] || '',
+      lastName: lastName || name?.split(' ').slice(1).join(' ') || '',
+      email,
+      role: role || EnumUserRole.STUDENT,
+      isActive: true,
+      isVerified: true,
+      providers: [provider],
+      displayName: name,
+      profilePicture: picture,
+      socialProviderIds: { [provider]: providerId }
+    };
+
+    auth = await Auth.create(newAuthData);
+  }
+
+  // Ensure profile exists in respective collection
+  const profileData = {
+    authId: auth._id,
+    firstName: auth.firstName,
+    lastName: auth.lastName,
+    email: auth.email,
+    profilePicture: auth.profilePicture
+  };
+
+  let profile;
+  switch (auth.role) {
+    case EnumUserRole.SUPER_ADMIN:
+      profile = await SuperAdmin.findOne({ authId: auth._id }).lean();
+      if (!profile) {
+        await SuperAdmin.create(profileData);
+      }
+      break;
+    case EnumUserRole.ADMIN:
+      profile = await Admin.findOne({ authId: auth._id }).lean();
+      if (!profile) {
+        await Admin.create(profileData);
+      }
+      break;
+    case EnumUserRole.STUDENT:
+      profile = await Student.findOne({ authId: auth._id }).lean();
+      if (!profile) {
+        await Student.create(profileData);
+      }
+      break;
+    case EnumUserRole.TEACHER:
+      profile = await Teacher.findOne({ authId: auth._id }).lean();
+      if (!profile) {
+        await Teacher.create(profileData);
+      }
+      break;
+    case EnumUserRole.SCHOOL:
+      profile = await School.findOne({ authId: auth._id }).lean();
+      if (!profile) {
+        await School.create(profileData);
+      }
+      break;
+    default:
+      profile = null;
+  }
+
+  // Get final profile with populated data
+  let result;
+  switch (auth.role) {
+    case EnumUserRole.SUPER_ADMIN:
+      result = await SuperAdmin.findOne({ authId: auth._id }).lean();
+      break;
+    case EnumUserRole.ADMIN:
+      result = await Admin.findOne({ authId: auth._id }).lean();
+      break;
+    case EnumUserRole.STUDENT:
+      result = await Student.findOne({ authId: auth._id }).lean();
+      break;
+    case EnumUserRole.TEACHER:
+      result = await Teacher.findOne({ authId: auth._id }).lean();
+      break;
+    case EnumUserRole.SCHOOL:
+      result = await School.findOne({ authId: auth._id }).lean();
+      break;
+    default:
+      result = null;
+  }
+
+  const tokenPayload = {
+    authId: auth._id,
+    userId: result ? result._id : null,
+    email: auth.email,
+    role: auth.role,
+  };
+
+  const jwtAccessToken = jwtHelpers.createToken(
+    tokenPayload,
+    config.jwt.secret,
+    config.jwt.expires_in
+  );
+  const refreshToken = jwtHelpers.createToken(
+    tokenPayload,
+    config.jwt.refresh_secret,
+    config.jwt.refresh_expires_in
+  );
+
+  // Check if student is in any class and include this information
+  let classMembershipInfo = {};
+  if (auth.role === EnumUserRole.STUDENT && result) {
+    classMembershipInfo = await checkStudentClassMembership(result._id);
+  }
+
+  return {
+    user: result ? { 
+      ...result, 
+      ...classMembershipInfo 
+    } : { 
+      authId: auth._id, 
+      email: auth.email, 
+      firstName: auth.firstName, 
+      lastName: auth.lastName,
+      profilePicture: auth.profilePicture
+    },
+    accessToken: jwtAccessToken,
+    refreshToken,
+    provider: provider
+  };
+};
+
+
 // Unset activationCode activationCodeExpire field for expired activation code
 // Unset isVerified, verificationCode, verificationCodeExpire field for expired verification code
 cron.schedule("* * * * *", async () => {
@@ -449,6 +710,7 @@ const AuthService = {
   activateAccount,
   forgetPassOtpVerify,
   resendActivationCode,
+  socialLogin,
 };
 
 module.exports = { AuthService };

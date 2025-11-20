@@ -14,9 +14,13 @@ router
   .post("/forgot-password", AuthController.forgotPass)
   .post("/forget-pass-otp-verify", AuthController.forgetPassOtpVerify)
   .post("/reset-password", AuthController.resetPassword)
+  .post("/social-signin", AuthController.socialSignIn)
+  .post("/social-signin/google", AuthController.socialSignIn)
+  .post("/social-signin/facebook", AuthController.socialSignIn)
+  .post("/social-signin/microsoft", AuthController.socialSignIn)
   .patch(
     "/change-password",
-    auth(config.auth_level.user),
+    auth([...config.auth_level.user, ...config.auth_level.school_admin]),
     AuthController.changePassword
   );
 

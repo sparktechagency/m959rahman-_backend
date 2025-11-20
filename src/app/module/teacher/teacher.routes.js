@@ -17,6 +17,7 @@ router
   .get("/students", auth(config.auth_level.teacher), TeacherController.getAllStudentsForTeacher) 
   .get("/all", auth(config.auth_level.admin), TeacherController.getAllTeachers)
   .get("/:id", auth(config.auth_level.admin), TeacherController.getTeacherById)
+  .patch("/:id", auth(config.auth_level.admin), TeacherController.blockUnblockTeacher)
 //   .get("/subscription", auth(config.auth_level.teacher), TeacherController.getSubscription)
 //   .patch("/subscription", auth(config.auth_level.teacher), TeacherController.updateSubscription)
 //   .post("/subscription/cancel", auth(config.auth_level.teacher), TeacherController.cancelSubscription)

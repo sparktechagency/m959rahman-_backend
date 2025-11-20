@@ -102,6 +102,15 @@ const getAllStudentsForTeacher = catchAsync(async (req, res) => {
   });
 });
 
+const blockUnblockTeacher = catchAsync(async (req, res) => {
+  const result = await TeacherService.blockUnblockTeacher(req.params.id, req.body.isBlocked);
+  sendResponse(res, {
+    statusCode: 200,
+    success: true,
+    message: "Teacher blocked/unblocked successfully",
+    data: result,
+  });
+}); 
 
 const TeacherController = {
   getProfile,
@@ -113,7 +122,8 @@ const TeacherController = {
   getSubscriptionPlans,
   getAllTeachers,
   getTeacherById,
-  getAllStudentsForTeacher
+  getAllStudentsForTeacher,
+  blockUnblockTeacher
 };
 
 module.exports = { TeacherController };
