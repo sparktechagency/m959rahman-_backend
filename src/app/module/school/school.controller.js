@@ -213,11 +213,19 @@ const handleUpdateSchoolProfile = async (req, res) => {
     // Prepare update data from the form fields
     const updateData = { ...req.body };
     
-    // Handle file upload if present
+    // Handle file uploads if present
+    // Handle profile image upload
     if (req.files && req.files.profile_image && req.files.profile_image.length > 0) {
       // Get the uploaded file path
       const profileImagePath = req.files.profile_image[0].path.replace(/\\/g, '/'); // Fix for Windows path
       updateData.profile_image = profileImagePath;
+    }
+    
+    // Handle cover image upload
+    if (req.files && req.files.cover_image && req.files.cover_image.length > 0) {
+      // Get the uploaded file path
+      const coverImagePath = req.files.cover_image[0].path.replace(/\\/g, '/'); // Fix for Windows path
+      updateData.cover_image = coverImagePath;
     }
     
     // Make sure we have some data to update

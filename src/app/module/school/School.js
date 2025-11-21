@@ -23,6 +23,10 @@ const SchoolSchema = new Schema(
       type: String,
       default: null,
     },
+    cover_image: {
+      type: String,
+      default: null,
+    },
     phoneNumber: {
       type: String,
     },

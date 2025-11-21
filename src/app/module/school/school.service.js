@@ -509,7 +509,7 @@ const updateSchoolProfile = async (schoolId, updateData) => {
   }
 
   // Fields that are allowed to be updated
-  const allowedFields = ['firstName', 'lastName', 'phoneNumber', 'address', 'profile_image'];
+  const allowedFields = ['firstName', 'lastName', 'phoneNumber', 'address', 'profile_image', 'cover_image'];
   
   // Filter out fields that aren't allowed to be updated
   const filteredData = {};
@@ -541,7 +541,7 @@ const getSchoolProfile = async (schoolId) => {
 
   // Find school by ID
   const school = await School.findById(schoolId)
-    .select('_id authId firstName lastName email profile_image phoneNumber address subscription')
+    .select('_id authId firstName lastName email profile_image phoneNumber address subscription cover_image')
     .populate({
       path: 'authId',
       select: 'firstName lastName email role'
@@ -561,6 +561,7 @@ const getSchoolProfile = async (schoolId) => {
     profile_image: school.profile_image,
     phoneNumber: school.phoneNumber || '',
     address: school.address || '',
+    cover_image: school.cover_image,
     subscription: {
       plan: school.subscription?.plan || 'basic',
       status: school.subscription?.status || 'inactive'
@@ -575,7 +576,7 @@ const getMySchoolProfile = async (userId) => {
 
   // Find school by the userId (which is the school's _id from JWT token)
   const school = await School.findById(userId)
-    .select('_id authId firstName lastName email profile_image phoneNumber address subscription')
+    .select('_id authId firstName lastName email profile_image phoneNumber address subscription cover_image')
     .populate({
       path: 'authId',
       select: 'firstName lastName email role'
@@ -595,6 +596,7 @@ const getMySchoolProfile = async (userId) => {
     profile_image: school.profile_image,
     phoneNumber: school.phoneNumber || '',
     address: school.address || '',
+    cover_image: school.cover_image,
     subscription: {
       plan: school.subscription?.plan || 'basic',
       status: school.subscription?.status || 'inactive'
@@ -789,6 +791,7 @@ const getSchoolDetails = async (schoolId) => {
     profile_image: school.profile_image,
     phoneNumber: school.phoneNumber || '',
     address: school.address || '',
+    cover_image: school.cover_image,
     isBlocked: school.isBlocked || false,
     subscription: {
       plan: school.subscription?.plan || 'basic',
