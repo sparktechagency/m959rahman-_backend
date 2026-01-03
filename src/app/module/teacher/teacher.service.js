@@ -53,12 +53,12 @@ const updateProfile = async (req) => {
     }
   }
 
-  // Update auth name if firstname or lastname is provided
-  if (data.firstname || data.lastname) {
+  // Update auth firstName/lastName if provided
+  if (data.firstName || data.lastName) {
     const auth = await Auth.findById(authId);
     if (auth) {
-      const newName = `${data.firstname || existingTeacher.firstname} ${data.lastname || existingTeacher.lastname}`;
-      auth.name = newName.trim();
+      if (data.firstName) auth.firstName = data.firstName;
+      if (data.lastName) auth.lastName = data.lastName;
       await auth.save();
     }
   }
@@ -83,7 +83,7 @@ const getSubscription = async (userData) => {
   const { userId } = userData;
 
   const teacher = await Teacher.findById(userId)
-    .select("subscription firstname lastname email")
+    .select("subscription firstName lastName email")
     .lean();
 
   if (!teacher) {
@@ -98,7 +98,7 @@ const getSubscription = async (userData) => {
 
   return {
     teacher: {
-      name: `${teacher.firstname} ${teacher.lastname}`,
+      name: `${teacher.firstName} ${teacher.lastName}`,
       email: teacher.email,
     },
     subscription: teacher.subscription,
@@ -207,157 +207,25 @@ const getSubscriptionPlans = async () => {
 };
 
 const getAllTeachers = async (query) => {
-  // Create the base query with full populate for all related information
   const teacherQuery = new QueryBuilder(
     Teacher.find({})
       .populate({
         path: "authId",
-        select: "firstName lastName email isVerified isBlocked isActive createdAt role"
+        select: "isVerified isBlocked isActive role",
       })
       .lean(),
     query
   )
-    .search(["firstname", "lastname", "email", "specialization"])
+    .search(["firstName", "lastName", "email", "specialization"])
     .sort()
     .paginate();
 
-  const [teachersRaw, meta] = await Promise.all([
+  const [teachers, meta] = await Promise.all([
     teacherQuery.modelQuery,
     teacherQuery.countTotal(),
   ]);
 
-  // Get all teacher IDs
-  const teacherIds = teachersRaw.map(teacher => teacher._id);
-
-  // Get classes taught by these teachers
-  const classCounts = await Class.aggregate([
-    { $match: { teacherId: { $in: teacherIds } } },
-    { $group: { _id: "$teacherId", count: { $sum: 1 } } }
-  ]);
-  
-  // Create a map for quick lookup
-  const classCountMap = {};
-  classCounts.forEach(item => {
-    classCountMap[item._id.toString()] = item.count;
-  });
-  
-  // Count total students per teacher (unique students across all classes)
-  const teacherClassesMap = {};
-  
-  // First get all classes by teacher
-  const allClasses = await Class.find({ teacherId: { $in: teacherIds } })
-    .select('_id teacherId students')
-    .lean();
-    
-  // Group classes by teacher
-  allClasses.forEach(cls => {
-    const teacherId = cls.teacherId.toString();
-    if (!teacherClassesMap[teacherId]) {
-      teacherClassesMap[teacherId] = [];
-    }
-    teacherClassesMap[teacherId].push(cls);
-  });
-  
-  // Count unique students per teacher
-  const studentCountMap = {};
-  Object.keys(teacherClassesMap).forEach(teacherId => {
-    const classes = teacherClassesMap[teacherId];
-    const uniqueStudents = new Set();
-    classes.forEach(cls => {
-      cls.students.forEach(student => {
-        if (student.status === 'active') {
-          uniqueStudents.add(student.studentId.toString());
-        }
-      });
-    });
-    studentCountMap[teacherId] = uniqueStudents.size;
-  });
-  
-  // Get assignments created by each teacher
-  const assignmentCounts = await Assignment.aggregate([
-    { $match: { teacherId: { $in: teacherIds } } },
-    { $group: { _id: "$teacherId", count: { $sum: 1 } } }
-  ]);
-  
-  // Create a map for quick lookup
-  const assignmentCountMap = {};
-  assignmentCounts.forEach(item => {
-    assignmentCountMap[item._id.toString()] = item.count;
-  });
-  
-  // Get schools associated with each teacher
-  const schoolTeachers = await SchoolTeacher.find({ teacherId: { $in: teacherIds } })
-    .populate({
-      path: 'schoolId',
-      select: 'firstName lastName email profile_image'
-    })
-    .lean();
-  
-  // Group schools by teacher
-  const teacherSchoolsMap = {};
-  schoolTeachers.forEach(relation => {
-    const teacherId = relation.teacherId.toString();
-    if (!teacherSchoolsMap[teacherId]) {
-      teacherSchoolsMap[teacherId] = [];
-    }
-    
-    if (relation.schoolId) {
-      teacherSchoolsMap[teacherId].push({
-        schoolId: relation.schoolId._id,
-        name: `${relation.schoolId.firstName || ''} ${relation.schoolId.lastName || ''}`.trim() || 'Unknown School',
-        email: relation.schoolId.email || '',
-        profile_image: relation.schoolId.profile_image || null,
-        status: relation.status,
-        joinedAt: relation.joinedAt
-      });
-    }
-  });
-
-  // Format the teachers with comprehensive information
-  const formattedTeachers = teachersRaw.map(teacher => {
-    const teacherId = teacher._id.toString();
-    
-    return {
-      _id: teacher._id,
-      authId: teacher.authId?._id,
-      firstName: teacher.firstname || teacher.authId?.firstName || '',
-      lastName: teacher.lastname || teacher.authId?.lastName || '',
-      fullName: `${teacher.firstname || teacher.authId?.firstName || ''} ${teacher.lastname || teacher.authId?.lastName || ''}`.trim(),
-      email: teacher.email || teacher.authId?.email || '',
-      profile_image: teacher.profile_image || null,
-      phoneNumber: teacher.phoneNumber || '',
-      isBlocked: teacher.isBlocked || false,
-      bio: teacher.bio || '',
-      specialization: teacher.specialization || '',
-      experience: teacher.experience || '',
-      qualifications: teacher.qualifications || [],
-      subscription: {
-        plan: teacher.subscription?.plan || 'free',
-        status: teacher.subscription?.status || 'inactive',
-        validUntil: teacher.subscription?.validUntil || null
-      },
-      auth: {
-        isVerified: teacher.authId?.isVerified || false,
-        isBlocked: teacher.authId?.isBlocked || false,
-        isActive: teacher.authId?.isActive || false,
-        role: teacher.authId?.role || ''
-      },
-      statistics: {
-        classesCount: classCountMap[teacherId] || 0,
-        studentsCount: studentCountMap[teacherId] || 0,
-        assignmentsCount: assignmentCountMap[teacherId] || 0,
-        schoolsCount: (teacherSchoolsMap[teacherId] || []).length
-      },
-      schools: teacherSchoolsMap[teacherId] || [],
-      createdAt: teacher.createdAt,
-      updatedAt: teacher.updatedAt
-    };
-  });
-
-  return {
-    meta,
-    teachers: formattedTeachers,
-  };
+  return { meta, teachers };
 };
 
 const getTeacherById = async (id) => {
@@ -381,14 +249,14 @@ const getTeacherById = async (id) => {
   const classes = await Class.find({ teacherId: id })
     .select('_id name subject grade description createdAt students')
     .lean();
-  
+
   // Count total unique students
   const uniqueStudents = new Set();
   const activeStudentsByClass = {};
-  
+
   classes.forEach(cls => {
     activeStudentsByClass[cls._id.toString()] = 0;
-    
+
     cls.students.forEach(student => {
       if (student.status === 'active') {
         uniqueStudents.add(student.studentId.toString());
@@ -396,7 +264,7 @@ const getTeacherById = async (id) => {
       }
     });
   });
-  
+
   // Format classes with student counts
   const formattedClasses = classes.map(cls => ({
     _id: cls._id,
@@ -417,7 +285,7 @@ const getTeacherById = async (id) => {
       select: '_id name subject'
     })
     .lean();
-  
+
   // Format assignments with submission statistics
   const formattedAssignments = assignments.map(assignment => {
     // Count submissions by status
@@ -427,13 +295,13 @@ const getTeacherById = async (id) => {
       pending: 0,
       late: 0
     };
-    
+
     assignment.submissions.forEach(sub => {
       if (sub.status === 'completed') submissionStats.completed++;
       else if (sub.status === 'pending') submissionStats.pending++;
       else if (sub.status === 'late') submissionStats.late++;
     });
-    
+
     return {
       _id: assignment._id,
       title: assignment.title,
@@ -448,7 +316,7 @@ const getTeacherById = async (id) => {
       createdAt: assignment.createdAt
     };
   });
-  
+
   // Get schools associated with this teacher
   const schoolTeachers = await SchoolTeacher.find({ teacherId: id })
     .populate({
@@ -456,7 +324,7 @@ const getTeacherById = async (id) => {
       select: '_id firstName lastName email profile_image address subscription'
     })
     .lean();
-  
+
   // Format school associations
   const schools = schoolTeachers.map(relation => ({
     relationId: relation._id,
@@ -477,9 +345,9 @@ const getTeacherById = async (id) => {
   const formattedTeacher = {
     _id: teacher._id,
     authId: teacher.authId?._id,
-    firstName: teacher.firstname || teacher.authId?.firstName || '',
-    lastName: teacher.lastname || teacher.authId?.lastName || '',
-    fullName: `${teacher.firstname || teacher.authId?.firstName || ''} ${teacher.lastname || teacher.authId?.lastName || ''}`.trim(),
+    firstName: teacher.firstName || '',
+    lastName: teacher.lastName || '',
+    fullName: `${teacher.firstName || ''} ${teacher.lastName || ''}`.trim(),
     email: teacher.email || teacher.authId?.email || '',
     profile_image: teacher.profile_image || null,
     phoneNumber: teacher.phoneNumber || '',
@@ -569,9 +437,8 @@ const getAllStudentsForTeacher = async (userData, query) => {
           _id: student.studentId._id,
           firstName: student.studentId.firstName || "N/A",
           lastName: student.studentId.lastName || "N/A",
-          fullName: `${student.studentId.firstName || ""} ${
-            student.studentId.lastName || ""
-          }`.trim(),
+          fullName: `${student.studentId.firstName || ""} ${student.studentId.lastName || ""
+            }`.trim(),
           email: student.studentId.email,
           profile_image: student.studentId.profile_image,
           phoneNumber: student.studentId.phoneNumber,
@@ -691,4 +558,4 @@ const TeacherService = {
   blockUnblockTeacher
 };
 
-module.exports = { TeacherService };
+module.exports = { TeacherService };  

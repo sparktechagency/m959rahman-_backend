@@ -47,12 +47,21 @@ const config = {
     api_secret: process.env.API_SECRET,
     cloudinary_url: process.env.CLOUDINARY_URL,
   },
+  aws: {
+    region: process.env.AWS_REGION || "us-east-1",
+    access_key_id: process.env.AWS_ACCESS_KEY_ID,
+    secret_access_key: process.env.AWS_SECRET_ACCESS_KEY,
+    s3_bucket: process.env.AWS_S3_BUCKET,
+  },
   stripe: {
     stripe_secret_key: process.env.STRIPE_SECRET_KEY,
+    stripe_public_key: process.env.STRIPE_PUBLIC_KEY,
+    stripe_webhook_secret: process.env.STRIPE_WEBHOOK_SECRET || process.env.STRIPE_WEBHOOK_SECRET_TEST,
     stripe_webhook_secret_test: process.env.STRIPE_WEBHOOK_SECRET_TEST,
     stripe_webhook_secret_production:
       process.env.STRIPE_WEBHOOK_SECRET_PRODUCTION,
   },
+  frontend_url: process.env.FRONTEND_URL || "http://localhost:3000",
   social_auth: {
     google: {
       client_id: process.env.GOOGLE_CLIENT_ID,

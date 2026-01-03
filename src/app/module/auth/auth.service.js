@@ -110,13 +110,13 @@ const registrationAccount = async (payload) => {
       break;
     case EnumUserRole.STUDENT:
       await Student.create(userData);
-      break;  
+      break;
     case EnumUserRole.TEACHER:
       await Teacher.create(userData);
       break;
     case EnumUserRole.SCHOOL:
       await School.create(userData);
-      break;      
+      break;
     default:
       throw new ApiError(status.BAD_REQUEST, "Invalid role. But auth created");
   }
@@ -184,11 +184,11 @@ const activateAccount = async (payload) => {
       break;
     case EnumUserRole.TEACHER:
       result = await Teacher.findOne({ authId: auth._id }).lean();
-      console.log(result)
+      // console.log(result)
       break;
     case EnumUserRole.SCHOOL:
       result = await School.findOne({ authId: auth._id }).lean();
-      console.log(result)
+      // console.log(result)
       break;
     default:
       result = await Auth.findOne({ authId: auth._id }).lean();
@@ -199,7 +199,7 @@ const activateAccount = async (payload) => {
     try {
       await postNotification(
         "New User Registration",
-        `A new ${auth.role.toLowerCase()} has registered: ${result.firstname} ${result.lastname} (${email})`
+        `A new ${auth?.role?.toLowerCase()} has registered: ${result?.firstName} ${result?.lastName} (${email})`
       );
     } catch (notificationError) {
       logger.error("Failed to send admin notification:", notificationError);
@@ -208,7 +208,7 @@ const activateAccount = async (payload) => {
 
   const tokenPayload = {
     authId: auth._id,
-    userId: result._id ,
+    userId: result._id,
     email,
     role: auth.role,
   };
@@ -282,6 +282,7 @@ const loginAccount = async (payload) => {
       result = await Teacher.findOne({ authId: auth._id })
         .populate("authId")
         .lean();
+      // console.log("Teacher", result)
       break;
     case EnumUserRole.SCHOOL:
       result = await School.findOne({ authId: auth._id })
@@ -462,8 +463,7 @@ const updateFieldsWithCron = async (check) => {
 
   if (result.modifiedCount > 0)
     logger.info(
-      `Removed ${result.modifiedCount} expired ${
-        check === "activation" ? "activation" : "verification"
+      `Removed ${result.modifiedCount} expired ${check === "activation" ? "activation" : "verification"
       } code`
     );
 };
@@ -479,7 +479,7 @@ const verifyFirebaseIdToken = async (idToken) => {
     if (!idToken || typeof idToken !== 'string') {
       throw new Error('Invalid token format');
     }
-    
+
     // Mock decoded token for development - replace with real Firebase verification in production
     const mockDecodedToken = {
       uid: 'dev-user-' + Math.random().toString(36).substr(2, 9),
@@ -489,7 +489,7 @@ const verifyFirebaseIdToken = async (idToken) => {
         sign_in_provider: 'google.com' // or 'facebook.com'
       }
     };
-    
+
     return mockDecodedToken;
   } catch (error) {
     throw new ApiError(status.UNAUTHORIZED, "Invalid social auth token");
@@ -503,7 +503,7 @@ const checkStudentClassMembership = async (studentId) => {
       'students.status': 'active',
       isActive: true
     }).select('_id name classCode').lean();
-    
+
     return {
       isInClass: classes.length > 0,
       classCount: classes.length,
@@ -526,7 +526,7 @@ const checkStudentClassMembership = async (studentId) => {
 
 const socialLogin = async (payload) => {
   const { accessToken, provider, role } = payload;
-  
+
   // Validate required fields
   if (!accessToken) {
     throw new ApiError(status.BAD_REQUEST, "Access token is required");
@@ -537,31 +537,31 @@ const socialLogin = async (payload) => {
 
   // Validate token with the respective provider and get user data
   const userData = await SocialAuthProviders.validateProviderToken(provider, accessToken);
-  
+
   const { email, name, firstName, lastName, picture, providerId } = userData;
-  
+
   // Find or create user by email
   let auth = await Auth.findOne({ email });
-  
+
   if (auth) {
     // Update existing user
     if (auth.isBlocked) {
       throw new ApiError(status.FORBIDDEN, "Account blocked. Contact support");
     }
-    
+
     // Ensure providers array contains provider
     const providers = new Set(auth.providers || []);
     providers.add(provider);
     auth.providers = Array.from(providers);
-    
+
     // Update social provider ID if not exists
     if (!auth.socialProviderIds) auth.socialProviderIds = {};
     auth.socialProviderIds[provider] = providerId;
-    
+
     if (!auth.isActive) auth.isActive = true;
     if (!auth.displayName && name) auth.displayName = name;
     if (picture && !auth.profilePicture) auth.profilePicture = picture;
-    
+
     await auth.save();
   } else {
     // Create new user
@@ -673,13 +673,13 @@ const socialLogin = async (payload) => {
   }
 
   return {
-    user: result ? { 
-      ...result, 
-      ...classMembershipInfo 
-    } : { 
-      authId: auth._id, 
-      email: auth.email, 
-      firstName: auth.firstName, 
+    user: result ? {
+      ...result,
+      ...classMembershipInfo
+    } : {
+      authId: auth._id,
+      email: auth.email,
+      firstName: auth.firstName,
       lastName: auth.lastName,
       profilePicture: auth.profilePicture
     },

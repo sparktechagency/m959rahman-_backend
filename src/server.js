@@ -2,6 +2,7 @@ const { errorLogger, logger } = require("./util/logger");
 const connectDB = require("./connection/connectDB");
 const config = require("./config");
 const mainServer = require("./connection/socket");
+const startAssignmentScheduler = require("./cron/assignmentScheduler");
 
 async function main() {
   try {
@@ -15,6 +16,9 @@ async function main() {
     // });
     mainServer.listen(Number(config.port), () => {
       logger.info(`App listening on http://${config.base_url}:${config.port}`);
+
+      // Start assignment scheduler cron job
+      startAssignmentScheduler();
     });
 
     process.on("unhandledRejection", (error) => {

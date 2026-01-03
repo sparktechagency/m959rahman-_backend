@@ -14,6 +14,7 @@ const NotificationRoutes = require("../module/notification/notification.routes")
 const ManageRoutes = require("../module/manage/manage.routes");
 const ClassRoutes = require("../module/class/class.routes");
 const AnswerValidationRoutes = require("../module/curriculum/answerValidation.routes");
+const SubscriptionRoutes = require("../module/subscription/subscription.routes");
 // const FeedbackRoutes = require("../module/feedback/feedback.routes");
 // const ReviewRoutes = require("../module/review/review.routes");
 // const PostRoutes = require("../module/post/post.routes");
@@ -68,6 +69,10 @@ const moduleRoutes = [
   {
     path: "/answer-validation",
     route: AnswerValidationRoutes,
+  },
+  {
+    path: "/subscription",
+    route: SubscriptionRoutes,
   },
   // {
   //   path: "/feedback",

@@ -40,14 +40,44 @@ const SchoolSchema = new Schema(
     subscription: {
       plan: {
         type: String,
-        enum: ["basic", "premium", "pro"],
+        enum: ["basic", "premium", "pro", "SCHOOL_YEARLY"],
         default: "basic"
       },
       status: {
         type: String,
-        enum: ["active", "inactive", "cancelled", "expired"],
+        enum: ["active", "inactive", "cancelled", "expired", "past_due", "trialing"],
         default: "inactive"
       },
+      // Stripe-specific fields
+      stripeSubscriptionId: {
+        type: String,
+        sparse: true,
+      },
+      stripeCustomerId: {
+        type: String,
+        sparse: true,
+      },
+      stripePriceId: {
+        type: String,
+      },
+      stripeProductId: {
+        type: String,
+      },
+      // Billing period tracking
+      currentPeriodStart: {
+        type: Date,
+      },
+      currentPeriodEnd: {
+        type: Date,
+      },
+      cancelAtPeriodEnd: {
+        type: Boolean,
+        default: false,
+      },
+      canceledAt: {
+        type: Date,
+      },
+      // Legacy fields (kept for backward compatibility)
       startDate: {
         type: Date,
       },

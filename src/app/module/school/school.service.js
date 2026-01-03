@@ -9,32 +9,33 @@ const Assignment = require("../class/Assignment");
 const StudentAssignment = require("../class/StudentAssignment");
 const QueryBuilder = require("../../../builder/queryBuilder");
 const Auth = require("../auth/Auth");
+const postNotification = require("../../../util/postNotification");
 
 
 const addTeacherToSchool = async (data, schoolId, authId) => {
   const { email } = data;
-  
+
   if (!mongoose.Types.ObjectId.isValid(schoolId)) {
     throw new ApiError(status.BAD_REQUEST, "Invalid school ID");
   }
-  
+
   if (!email) {
     throw new ApiError(status.BAD_REQUEST, "Email is required");
   }
 
   // Validate school exists
-  const school = await School.findById(schoolId);   
+  const school = await School.findById(schoolId);
   if (!school) {
     throw new ApiError(status.NOT_FOUND, "School not found");
   }
 
   // Find existing teacher by email
   const teacher = await Teacher.findOne({ email }).populate('authId').lean();
-  
+
   if (!teacher) {
     throw new ApiError(status.NOT_FOUND, "Teacher not found with this email");
   }
-  
+
   // Log teacher info for debugging
   console.log('Adding teacher:', {
     email,
@@ -71,6 +72,17 @@ const addTeacherToSchool = async (data, schoolId, authId) => {
     email,
   });
 
+  // Send notification to the teacher
+  try {
+    await postNotification(
+      "Added to School",
+      `You have been assigned to "${school.firstName || school.lastName || 'a school'}". Welcome aboard!`,
+      teacher.authId?._id || teacher.authId
+    );
+  } catch (notificationError) {
+    console.error("Failed to send teacher notification:", notificationError);
+  }
+
   return schoolTeacher;
 };
 
@@ -79,7 +91,7 @@ const getAllTeachersInSchool = async (schoolId, query) => {
   if (!mongoose.Types.ObjectId.isValid(schoolId)) {
     throw new ApiError(status.BAD_REQUEST, "Invalid school ID");
   }
-  
+
   // Validate school exists
   const school = await School.findById(schoolId);
   if (!school) {
@@ -100,48 +112,48 @@ const getAllTeachersInSchool = async (schoolId, query) => {
 
   // First, let's get all the emails of teachers in the school
   const teacherEmails = schoolTeachers.map(st => st.email).filter(Boolean);
-  
+
   // Find Auth records by email - this is the source of truth for name data
   // since names are provided during registration in the auth model
-  const authDetailsByEmail = await Auth.find({ 
-    email: { $in: teacherEmails } 
+  const authDetailsByEmail = await Auth.find({
+    email: { $in: teacherEmails }
   }).select('_id email firstName lastName role').lean();
-  
+
   // Create a map of auth details by email for quick lookup
   const authMapByEmail = {};
   authDetailsByEmail.forEach(auth => {
     if (auth.email) {
       authMapByEmail[auth.email] = auth;
-    //   console.log(`Found auth record for ${auth.email}: firstName=${auth.firstName}, lastName=${auth.lastName}`);
+      //   console.log(`Found auth record for ${auth.email}: firstName=${auth.firstName}, lastName=${auth.lastName}`);
     }
   });
 
   // Get all teacher IDs
   const teacherIds = schoolTeachers.map(st => st.teacherId);
-//   console.log("teacherIds", teacherIds)
+  //   console.log("teacherIds", teacherIds)
 
   // Get teacher details with all needed fields
   const teacherDetails = await Teacher.find({ _id: { $in: teacherIds } })
     .select('_id authId firstname lastname email profile_image phoneNumber bio specialization')
     .lean();
-//   console.log("teacherDetails", teacherDetails)
+  //   console.log("teacherDetails", teacherDetails)
 
   // Create a map of teacher details for quick lookup
   const teachersMap = {};
   teacherDetails.forEach(teacher => {
     teachersMap[teacher._id.toString()] = teacher;
   });
-  
+
   // Get all authIds from teachers to find auth records directly
   const authIds = teacherDetails
     .map(teacher => teacher.authId)
     .filter(id => id); // filter out any null/undefined IDs
-    
+
   // Get auth details by ID for backup name data
-  const authDetailsById = await Auth.find({ 
-    _id: { $in: authIds } 
+  const authDetailsById = await Auth.find({
+    _id: { $in: authIds }
   }).select('_id email firstName lastName').lean();
-  
+
   // Create a map of auth details by ID
   const authMapById = {};
   authDetailsById.forEach(auth => {
@@ -149,29 +161,29 @@ const getAllTeachersInSchool = async (schoolId, query) => {
       authMapById[auth._id.toString()] = auth;
     }
   });
-  
-//   console.log(`Found: ${teacherEmails.length} emails, ${authDetailsByEmail.length} auth by email, ${teacherDetails.length} teachers, ${authDetailsById.length} auth by ID`);
+
+  //   console.log(`Found: ${teacherEmails.length} emails, ${authDetailsByEmail.length} auth by email, ${teacherDetails.length} teachers, ${authDetailsById.length} auth by ID`);
 
   // Find all classes for these teachers
   const classes = await Class.find({ teacherId: { $in: teacherIds } });
-  
+
   // Create a map for class counts per teacher
   const classCountMap = {};
   const studentCountMap = {};
-  
+
   // Count classes and unique students for each teacher
   classes.forEach(cls => {
     const teacherId = cls.teacherId.toString();
-    
+
     // Initialize counters if not already set
     if (!classCountMap[teacherId]) {
       classCountMap[teacherId] = 0;
       studentCountMap[teacherId] = new Set();
     }
-    
+
     // Increment class count
     classCountMap[teacherId]++;
-    
+
     // Add all student IDs to the set (this will automatically deduplicate)
     cls.students.forEach(student => {
       if (student.status === 'active') {
@@ -185,32 +197,32 @@ const getAllTeachersInSchool = async (schoolId, query) => {
     const teacherId = st.teacherId.toString();
     const teacher = teachersMap[teacherId] || {};
     const teacherEmail = st.email || teacher.email || '';
-    
+
     // Get name from the Auth record directly by email (most reliable source)
     // or by authId as backup
     const authByEmail = teacherEmail ? authMapByEmail[teacherEmail] : null;
     const authById = teacher.authId ? authMapById[teacher.authId.toString()] : null;
-    
+
     // Get name from most reliable source first (Auth by email > Auth by ID > Teacher record)
-    const firstName = 
+    const firstName =
       authByEmail?.firstName ||
       authById?.firstName ||
-      teacher.firstname || 
+      teacher.firstname ||
       '';
-      
-    const lastName = 
+
+    const lastName =
       authByEmail?.lastName ||
       authById?.lastName ||
-      teacher.lastname || 
+      teacher.lastname ||
       '';
-      
+
     // Create full name with proper fallbacks
-    let fullName = firstName && lastName ? 
-      `${firstName} ${lastName}` : 
-      firstName || lastName || 
-      teacherEmail || 
+    let fullName = firstName && lastName ?
+      `${firstName} ${lastName}` :
+      firstName || lastName ||
+      teacherEmail ||
       'Unknown Teacher';
-    
+
     // Detailed debugging for teacher formatting
     // console.log(`Teacher ${teacherEmail} info sources:`, {
     //   // Info sources
@@ -218,7 +230,7 @@ const getAllTeachersInSchool = async (schoolId, query) => {
     //   emailAuthId: authByEmail?._id?.toString(),
     //   hasAuthById: !!authById,
     //   authByIdEmail: authById?.email,
-      
+
     //   // Name sources
     //   finalFirstName: firstName,
     //   finalLastName: lastName,
@@ -228,11 +240,11 @@ const getAllTeachersInSchool = async (schoolId, query) => {
     //   authByIdLastName: authById?.lastName,
     //   teacherFirstname: teacher.firstname,
     //   teacherLastname: teacher.lastname,
-      
+
     //   // Final output
     //   fullName
     // });
-    
+
     return {
       relationId: st._id,
       teacherId: teacher._id,
@@ -269,11 +281,11 @@ const getTeacherDetails = async (schoolId, teacherId) => {
   }
 
   // Verify the teacher belongs to this school
-  const schoolTeacher = await SchoolTeacher.findOne({ 
-    schoolId, 
-    teacherId 
+  const schoolTeacher = await SchoolTeacher.findOne({
+    schoolId,
+    teacherId
   });
-  
+
   if (!schoolTeacher) {
     throw new ApiError(status.NOT_FOUND, "Teacher not found in this school");
   }
@@ -286,7 +298,7 @@ const getTeacherDetails = async (schoolId, teacherId) => {
   const classes = await Class.find({ teacherId });
 
   // Get all student IDs from classes
-  const studentIds = classes.flatMap(cls => 
+  const studentIds = classes.flatMap(cls =>
     cls.students.map(student => student.studentId)
   );
 
@@ -294,7 +306,7 @@ const getTeacherDetails = async (schoolId, teacherId) => {
   const uniqueStudentIds = [...new Set(studentIds.map(id => id.toString()))];
 
   // Get all assignment IDs from classes
-  const assignmentIds = classes.flatMap(cls => 
+  const assignmentIds = classes.flatMap(cls =>
     cls.assignments.map(assignment => assignment.assignmentId)
   );
 
@@ -307,7 +319,7 @@ const getTeacherDetails = async (schoolId, teacherId) => {
   // Get assignment completion stats
   let totalSubmissions = 0;
   let totalCompletions = 0;
-  
+
   if (assignments.length > 0) {
     const assignmentStats = await StudentAssignment.aggregate([
       {
@@ -320,14 +332,14 @@ const getTeacherDetails = async (schoolId, teacherId) => {
           _id: null,
           totalSubmissions: { $sum: 1 },
           completedAssignments: {
-            $sum: { 
+            $sum: {
               $cond: [{ $eq: ["$status", "completed"] }, 1, 0]
             }
           }
         }
       }
     ]);
-    
+
     if (assignmentStats.length > 0) {
       totalSubmissions = assignmentStats[0].totalSubmissions;
       totalCompletions = assignmentStats[0].completedAssignments;
@@ -335,8 +347,8 @@ const getTeacherDetails = async (schoolId, teacherId) => {
   }
 
   // Calculate completion rate
-  const completionRate = totalSubmissions > 0 
-    ? (totalCompletions / totalSubmissions * 100).toFixed(2) 
+  const completionRate = totalSubmissions > 0
+    ? (totalCompletions / totalSubmissions * 100).toFixed(2)
     : 0;
 
   return {
@@ -365,16 +377,16 @@ const updateTeacherStatus = async (schoolId, teacherId, status) => {
   if (!["active", "blocked"].includes(status)) {
     throw new ApiError(status.BAD_REQUEST, "Invalid status. Must be 'active' or 'blocked'");
   }
-  
+
   const schoolTeacher = await SchoolTeacher.findOne({ schoolId, teacherId });
-  
+
   if (!schoolTeacher) {
     throw new ApiError(status.NOT_FOUND, "Teacher not found in this school");
   }
-  
+
   schoolTeacher.status = status;
   await schoolTeacher.save();
-  
+
   return schoolTeacher;
 };
 
@@ -389,18 +401,18 @@ const removeTeacherFromSchool = async (schoolId, teacherId) => {
 
   // Verify the relation exists before deleting
   const schoolTeacher = await SchoolTeacher.findOne({ schoolId, teacherId });
-  
+
   if (!schoolTeacher) {
     throw new ApiError(status.NOT_FOUND, "Teacher not found in this school");
   }
-  
+
   const result = await SchoolTeacher.deleteOne({ schoolId, teacherId });
-  
+
   if (result.deletedCount === 0) {
     throw new ApiError(status.INTERNAL_SERVER_ERROR, "Failed to remove teacher from school");
   }
-  
-  return { 
+
+  return {
     success: true,
     message: "Teacher removed from school successfully",
     data: {
@@ -416,7 +428,7 @@ const getSchoolDashboardStats = async (schoolId) => {
   if (!mongoose.Types.ObjectId.isValid(schoolId)) {
     throw new ApiError(status.BAD_REQUEST, "Invalid school ID");
   }
-  
+
   // Validate school exists
   const school = await School.findById(schoolId);
   if (!school) {
@@ -426,28 +438,28 @@ const getSchoolDashboardStats = async (schoolId) => {
   // Find all teachers in this school
   const schoolTeachers = await SchoolTeacher.find({ schoolId });
   const teacherIds = schoolTeachers.map(st => st.teacherId);
-  
+
   // Find all classes created by these teachers
   const classes = await Class.find({ teacherId: { $in: teacherIds } });
   const classIds = classes.map(cls => cls._id);
-  
+
   // Get all student IDs from classes
-  const studentIds = classes.flatMap(cls => 
+  const studentIds = classes.flatMap(cls =>
     cls.students.map(student => student.studentId)
   );
-  
+
   // Remove duplicates
   const uniqueStudentIds = [...new Set(studentIds.map(id => id.toString()))];
-  
+
   // Find all assignments in these classes
-  const assignmentIds = classes.flatMap(cls => 
+  const assignmentIds = classes.flatMap(cls =>
     cls.assignments.map(assignment => assignment.assignmentId)
   );
-  
+
   // Get assignment completion stats
   let totalSubmissions = 0;
   let totalCompletions = 0;
-  
+
   if (assignmentIds.length > 0) {
     const assignmentStats = await StudentAssignment.aggregate([
       {
@@ -460,25 +472,25 @@ const getSchoolDashboardStats = async (schoolId) => {
           _id: null,
           totalSubmissions: { $sum: 1 },
           completedAssignments: {
-            $sum: { 
+            $sum: {
               $cond: [{ $eq: ["$status", "completed"] }, 1, 0]
             }
           }
         }
       }
     ]);
-    
+
     if (assignmentStats.length > 0) {
       totalSubmissions = assignmentStats[0].totalSubmissions;
       totalCompletions = assignmentStats[0].completedAssignments;
     }
   }
-  
+
   // Calculate completion rate
-  const completionRate = totalSubmissions > 0 
-    ? (totalCompletions / totalSubmissions * 100).toFixed(2) 
+  const completionRate = totalSubmissions > 0
+    ? (totalCompletions / totalSubmissions * 100).toFixed(2)
     : 0;
-  
+
   return {
     totalTeachers: teacherIds.length,
     totalStudents: uniqueStudentIds.length,
@@ -510,7 +522,7 @@ const updateSchoolProfile = async (schoolId, updateData) => {
 
   // Fields that are allowed to be updated
   const allowedFields = ['firstName', 'lastName', 'phoneNumber', 'address', 'profile_image', 'cover_image'];
-  
+
   // Filter out fields that aren't allowed to be updated
   const filteredData = {};
   Object.keys(updateData).forEach(key => {
@@ -518,7 +530,7 @@ const updateSchoolProfile = async (schoolId, updateData) => {
       filteredData[key] = updateData[key];
     }
   });
-  
+
   // Check if there are any valid fields to update
   if (Object.keys(filteredData).length === 0) {
     throw new ApiError(status.BAD_REQUEST, "No valid fields to update");
@@ -644,29 +656,29 @@ const getAllSchools = async (query) => {
   // Get teacher IDs for each school to find students
   const schoolTeacherMap = {};
   const allTeacherIds = [];
-  
+
   // Get all school-teacher relationships
   const schoolTeachers = await SchoolTeacher.find({ schoolId: { $in: schoolIds } })
     .lean();
-  
+
   // Organize teachers by school and collect all teacher IDs
   schoolTeachers.forEach(relation => {
     const schoolId = relation.schoolId.toString();
     const teacherId = relation.teacherId;
-    
+
     if (!schoolTeacherMap[schoolId]) {
       schoolTeacherMap[schoolId] = [];
     }
-    
+
     schoolTeacherMap[schoolId].push(teacherId);
     allTeacherIds.push(teacherId);
   });
-  
+
   // Get classes for all teachers across all schools
   const classes = await Class.find({ teacherId: { $in: allTeacherIds } })
     .select('_id teacherId students')
     .lean();
-  
+
   // Map classes to teachers
   const teacherClassesMap = {};
   classes.forEach(cls => {
@@ -676,20 +688,20 @@ const getAllSchools = async (query) => {
     }
     teacherClassesMap[teacherId].push(cls);
   });
-  
+
   // Count unique students per school
   const schoolStudentCountMap = {};
-  
+
   // For each school, go through all its teachers' classes and count unique students
   schoolIds.forEach(schoolId => {
     const sId = schoolId.toString();
     const teacherIds = schoolTeacherMap[sId] || [];
     const uniqueStudents = new Set();
-    
+
     teacherIds.forEach(teacherId => {
       const tId = teacherId.toString();
       const teacherClasses = teacherClassesMap[tId] || [];
-      
+
       teacherClasses.forEach(cls => {
         cls.students.forEach(student => {
           if (student.status === 'active') {
@@ -698,14 +710,14 @@ const getAllSchools = async (query) => {
         });
       });
     });
-    
+
     schoolStudentCountMap[sId] = uniqueStudents.size;
   });
 
   // Format the schools with comprehensive information including student counts
   const schools = schoolsRaw.map(school => {
     const schoolId = school._id.toString();
-    
+
     return {
       _id: school._id,
       authId: school.authId?._id,
@@ -755,14 +767,14 @@ const getSchoolDetails = async (schoolId) => {
 
   // Get teacher count for this school
   const teacherCount = await SchoolTeacher.countDocuments({ schoolId });
-  
+
   // Get all teacher IDs in this school
   const teacherRelations = await SchoolTeacher.find({ schoolId });
   const teacherIds = teacherRelations.map(relation => relation.teacherId);
-  
+
   // Count classes in this school
   const classCount = await Class.countDocuments({ teacherId: { $in: teacherIds } });
-  
+
   // Get student count (unique students across all classes)
   const classes = await Class.find({ teacherId: { $in: teacherIds } });
   const studentSet = new Set();
@@ -776,8 +788,8 @@ const getSchoolDetails = async (schoolId) => {
   const studentCount = studentSet.size;
 
   // Get assignments count
-  const assignmentCount = await Assignment.countDocuments({ 
-    classId: { $in: classes.map(cls => cls._id) } 
+  const assignmentCount = await Assignment.countDocuments({
+    classId: { $in: classes.map(cls => cls._id) }
   });
 
   // Format the response with all details

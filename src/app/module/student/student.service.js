@@ -157,7 +157,7 @@ const getAllStudentsForAdmin = async (query) => {
 
   // Get all student IDs
   const studentIds = studentsRaw.map(student => student._id);
-  
+
   // Get classes information for each student (which classes they are enrolled in)
   const classes = await Class.find({ 'students.studentId': { $in: studentIds } })
     .select('_id name subject grade teacherId students')
@@ -166,10 +166,10 @@ const getAllStudentsForAdmin = async (query) => {
       select: 'firstname lastname email profile_image'
     })
     .lean();
-    
+
   // Process class information with teacher details
   const classEnrollmentMap = {};
-  
+
   classes.forEach(cls => {
     // Extract teacher information
     const teacher = {
@@ -178,22 +178,22 @@ const getAllStudentsForAdmin = async (query) => {
       email: cls.teacherId?.email || '',
       profile_image: cls.teacherId?.profile_image || null
     };
-    
+
     // Find all students in this class
     cls.students.forEach(student => {
       if (!studentIds.some(id => id.toString() === student.studentId.toString())) {
         return; // Skip if not in our target students
       }
-      
+
       const studentId = student.studentId.toString();
-      
+
       if (!classEnrollmentMap[studentId]) {
         classEnrollmentMap[studentId] = {
           classCount: 0,
           classes: []
         };
       }
-      
+
       // Add class with teacher information
       if (classEnrollmentMap[studentId].classes.length < 5) { // Limit to 5 classes for preview
         classEnrollmentMap[studentId].classes.push({
@@ -206,31 +206,32 @@ const getAllStudentsForAdmin = async (query) => {
           teacher: teacher
         });
       }
-      
+
       classEnrollmentMap[studentId].classCount++;
     });
   });
-  
+
   // Get assignment completion statistics
   const assignmentStats = await Assignment.aggregate([
     { $match: { 'submissions.studentId': { $in: studentIds } } },
     { $unwind: '$submissions' },
     { $match: { 'submissions.studentId': { $in: studentIds } } },
-    { $group: {
+    {
+      $group: {
         _id: '$submissions.studentId',
         totalAssignments: { $sum: 1 },
         completedAssignments: { $sum: { $cond: [{ $eq: ['$submissions.status', 'completed'] }, 1, 0] } }
       }
     }
   ]);
-  
+
   // Create a map for quick lookup
   const assignmentStatsMap = {};
   assignmentStats.forEach(item => {
     assignmentStatsMap[item._id.toString()] = {
       totalAssignments: item.totalAssignments,
       completedAssignments: item.completedAssignments,
-      completionRate: item.totalAssignments > 0 ? 
+      completionRate: item.totalAssignments > 0 ?
         Math.round((item.completedAssignments / item.totalAssignments) * 100) : 0
     };
   });
@@ -239,9 +240,9 @@ const getAllStudentsForAdmin = async (query) => {
   const students = studentsRaw.map(student => {
     const studentId = student._id.toString();
     const enrollmentInfo = classEnrollmentMap[studentId] || { classCount: 0, classes: [] };
-    const assignmentInfo = assignmentStatsMap[studentId] || 
+    const assignmentInfo = assignmentStatsMap[studentId] ||
       { totalAssignments: 0, completedAssignments: 0, completionRate: 0 };
-    
+
     return {
       _id: student._id,
       authId: student.authId?._id,
@@ -301,13 +302,13 @@ const getStudentDetailsForAdmin = async (studentId) => {
       select: 'firstname lastname email profile_image'
     })
     .lean();
-  
+
   // Format class enrollments with student-specific status
   const classes = classEnrollments.map(cls => {
     const studentEntry = cls.students.find(
       s => s.studentId.toString() === studentId.toString()
     );
-    
+
     return {
       classId: cls._id,
       name: cls.name,
@@ -325,7 +326,7 @@ const getStudentDetailsForAdmin = async (studentId) => {
       totalStudents: cls.students.length
     };
   });
-  
+
   // Get assignment submissions for this student
   const assignments = await Assignment.find({ 'submissions.studentId': studentId })
     .select('_id title description dueDate classId submissions')
@@ -334,13 +335,13 @@ const getStudentDetailsForAdmin = async (studentId) => {
       select: 'name subject'
     })
     .lean();
-  
+
   // Format assignment information with submission details
   const formattedAssignments = assignments.map(assignment => {
     const submission = assignment.submissions.find(
       s => s.studentId.toString() === studentId.toString()
     );
-    
+
     return {
       assignmentId: assignment._id,
       title: assignment.title,
@@ -409,13 +410,13 @@ const getMyAssignments = async (studentData, query) => {
         path: 'assignmentId',
         select: 'assignmentName description dueDate totalMarks duration curriculumId topicId',
         populate: [
-          { 
-            path: 'curriculumId', 
+          {
+            path: 'curriculumId',
             select: 'name',
             match: { isActive: true }
           },
-          { 
-            path: 'topicId', 
+          {
+            path: 'topicId',
             select: 'name',
             match: { isActive: true }
           }
@@ -494,7 +495,7 @@ const getAssignmentDetails = async (studentData, assignmentId) => {
     .populate({
       path: 'assignmentId',
       populate: [
-        { 
+        {
           path: 'questions',
           select: 'questionText questionImage attachments'
         },
@@ -531,142 +532,159 @@ const getAssignmentDetails = async (studentData, assignmentId) => {
 };
 
 const joinClassByCode = async (userData, data) => {
-    validateFields(data, ["classCode"]);
+  validateFields(data, ["classCode"]);
 
-    const { userId } = userData;
+  const { userId } = userData;
 
-    // Verify student exists
-    const student = await Student.findById(userId);
-    if (!student) {
-        throw new ApiError(status.NOT_FOUND, "Student not found");
+  // Verify student exists
+  const student = await Student.findById(userId);
+  if (!student) {
+    throw new ApiError(status.NOT_FOUND, "Student not found");
+  }
+
+  // Find class by code (must be active)
+  const classData = await Class.findOne({
+    classCode: data.classCode.toUpperCase(), // Normalize to uppercase
+    isActive: true
+  });
+
+  if (!classData) {
+    throw new ApiError(status.NOT_FOUND, "Invalid class code or class not found");
+  }
+
+  // Check if class has reached maximum students
+  const activeStudents = classData.students.filter(s => s.status === 'active');
+  if (activeStudents.length >= classData.maxStudents) {
+    throw new ApiError(status.BAD_REQUEST, "Class has reached maximum student capacity");
+  }
+
+  // Check if student is already in class
+  const existingStudent = classData.students.find(
+    s => s.studentId.toString() === userId
+  );
+
+  if (existingStudent && existingStudent.status === 'active') {
+    throw new ApiError(status.BAD_REQUEST, "You are already enrolled in this class");
+  }
+
+  const session = await mongoose.startSession();
+  session.startTransaction();
+
+  try {
+    if (existingStudent && existingStudent.status === 'inactive') {
+      // Reactivate inactive student
+      await Class.updateOne(
+        {
+          _id: classData._id,
+          "students.studentId": userId
+        },
+        {
+          $set: { "students.$.status": "active" },
+          $set: { "students.$.joinedAt": new Date() }
+        },
+        { session }
+      );
+
+      // Reactivate student assignments
+      await StudentAssignment.updateMany(
+        {
+          studentId: userId,
+          classId: classData._id,
+          status: "inactive"
+        },
+        { status: "not_started" },
+        { session }
+      );
+    } else {
+      // Add new student to class
+      await Class.updateOne(
+        { _id: classData._id },
+        {
+          $push: {
+            students: {
+              studentId: userId,
+              status: 'active',
+              joinedAt: new Date()
+            }
+          }
+        },
+        { session }
+      );
+
+      // Assign all active, published, and non-expired assignments to this student
+      const activeAssignments = classData.assignments.filter(a => a.status === 'active');
+
+      if (activeAssignments.length > 0) {
+        const validAssignments = [];
+
+        // Check each assignment for publishStatus and dueDate validity
+        for (const assignment of activeAssignments) {
+          const fullAssignment = await Assignment.findById(assignment.assignmentId).session(session);
+
+          // Only assign if:
+          // 1. Assignment exists (not deleted)
+          // 2. Assignment is published
+          // 3. Assignment hasn't expired (dueDate is in the future or no dueDate set)
+          if (fullAssignment &&
+            fullAssignment.publishStatus === 'published' &&
+            (!fullAssignment.dueDate || new Date(fullAssignment.dueDate) > new Date())) {
+            validAssignments.push({
+              studentId: userId,
+              assignmentId: assignment.assignmentId,
+              classId: classData._id,
+              status: "not_started"
+            });
+          }
+        }
+
+        if (validAssignments.length > 0) {
+          await StudentAssignment.insertMany(validAssignments, { session });
+        }
+      }
     }
 
-    // Find class by code (must be active)
-    const classData = await Class.findOne({ 
-        classCode: data.classCode.toUpperCase(), // Normalize to uppercase
-        isActive: true 
-    });
+    await session.commitTransaction();
 
-    if (!classData) {
-        throw new ApiError(status.NOT_FOUND, "Invalid class code or class not found");
-    }
-
-    // Check if class has reached maximum students
-    const activeStudents = classData.students.filter(s => s.status === 'active');
-    if (activeStudents.length >= classData.maxStudents) {
-        throw new ApiError(status.BAD_REQUEST, "Class has reached maximum student capacity");
-    }
-
-    // Check if student is already in class
-    const existingStudent = classData.students.find(
-        s => s.studentId.toString() === userId
-    );
-
-    if (existingStudent && existingStudent.status === 'active') {
-        throw new ApiError(status.BAD_REQUEST, "You are already enrolled in this class");
-    }
-
-    const session = await mongoose.startSession();
-    session.startTransaction();
-
+    // Send notification to student
     try {
-        if (existingStudent && existingStudent.status === 'inactive') {
-            // Reactivate inactive student
-            await Class.updateOne(
-                { 
-                    _id: classData._id,
-                    "students.studentId": userId
-                },
-                { 
-                    $set: { "students.$.status": "active" },
-                    $set: { "students.$.joinedAt": new Date() }
-                },
-                { session }
-            );
-
-            // Reactivate student assignments
-            await StudentAssignment.updateMany(
-                {
-                    studentId: userId,
-                    classId: classData._id,
-                    status: "inactive"
-                },
-                { status: "not_started" },
-                { session }
-            );
-        } else {
-            // Add new student to class
-            await Class.updateOne(
-                { _id: classData._id },
-                { 
-                    $push: { 
-                        students: {
-                            studentId: userId,
-                            status: 'active',
-                            joinedAt: new Date()
-                        }
-                    }
-                },
-                { session }
-            );
-
-            // Assign all active assignments to this student
-            const activeAssignments = classData.assignments.filter(a => a.status === 'active');
-            
-            if (activeAssignments.length > 0) {
-                const studentAssignments = activeAssignments.map(assignment => ({
-                    studentId: userId,
-                    assignmentId: assignment.assignmentId,
-                    classId: classData._id,
-                    status: "not_started"
-                }));
-
-                await StudentAssignment.insertMany(studentAssignments, { session });
-            }
-        }
-
-        await session.commitTransaction();
-
-        // Send notification to student
-        try {
-            await postNotification(
-                "Successfully Joined Class",
-                `You have successfully joined the class "${classData.name}" using class code ${data.classCode}. Check your dashboard for new assignments.`,
-                userId
-            );
-        } catch (notificationError) {
-            console.error("Failed to send join notification:", notificationError);
-        }
-
-        // Return updated class info
-        const updatedClass = await Class.findById(classData._id)
-            .populate("teacherId", "firstName lastName email")
-            .lean();
-
-        return {
-            success: true,
-            message: `Successfully joined class "${classData.name}"`,
-            class: {
-                _id: updatedClass._id,
-                name: updatedClass.name,
-                classCode: updatedClass.classCode,
-                teacher: {
-                    firstName: updatedClass.teacherId.firstName,
-                    lastName: updatedClass.teacherId.lastName,
-                    email: updatedClass.teacherId.email
-                },
-                studentCount: updatedClass.students.filter(s => s.status === 'active').length,
-                assignmentCount: updatedClass.assignments.filter(a => a.status === 'active').length,
-                joinedAt: new Date()
-            }
-        };
-
-    } catch (error) {
-        await session.abortTransaction();
-        throw error;
-    } finally {
-        session.endSession();
+      await postNotification(
+        "Successfully Joined Class",
+        `You have successfully joined the class "${classData.name}" using class code ${data.classCode}. Check your dashboard for new assignments.`,
+        userId
+      );
+    } catch (notificationError) {
+      console.error("Failed to send join notification:", notificationError);
     }
+
+    // Return updated class info
+    const updatedClass = await Class.findById(classData._id)
+      .populate("teacherId", "firstName lastName email")
+      .lean();
+
+    return {
+      success: true,
+      message: `Successfully joined class "${classData.name}"`,
+      class: {
+        _id: updatedClass._id,
+        name: updatedClass.name,
+        classCode: updatedClass.classCode,
+        teacher: {
+          firstName: updatedClass.teacherId.firstName,
+          lastName: updatedClass.teacherId.lastName,
+          email: updatedClass.teacherId.email
+        },
+        studentCount: updatedClass.students.filter(s => s.status === 'active').length,
+        assignmentCount: updatedClass.assignments.filter(a => a.status === 'active').length,
+        joinedAt: new Date()
+      }
+    };
+
+  } catch (error) {
+    await session.abortTransaction();
+    throw error;
+  } finally {
+    session.endSession();
+  }
 };
 
 const StudentService = {

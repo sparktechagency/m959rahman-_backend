@@ -18,3 +18,7 @@ build/
 # OS files
 .DS_Store
 Thumbs.db
+uploads/
+ANSWER_VALIDATION_SYSTEM.md/
+NOTIFICATION_REVIEW.md/
+SOCIAL_AUTH_SETUP.md/

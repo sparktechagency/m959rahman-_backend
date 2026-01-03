@@ -46,6 +46,14 @@ const AssignmentSchema = new Schema(
       type: Boolean,
       default: true,
     },
+    publishAt: {
+      type: Date,
+    },
+    publishStatus: {
+      type: String,
+      enum: ["draft", "scheduled", "published"],
+      default: "published",
+    },
   },
   {
     timestamps: true,
