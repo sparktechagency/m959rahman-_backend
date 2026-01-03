@@ -1,6 +1,6 @@
 const express = require("express");
 const auth = require("../../middleware/auth");
-const { uploadFile } = require("../../middleware/fileUploader");
+const { uploadFile } = require("../../middleware/fileUploaderS3");
 const { StudentController } = require("./student.controller");
 const config = require("../../../config");
 
@@ -29,7 +29,7 @@ router
   .patch(
     "/edit-profile",
     auth(config.auth_level.student),
-    uploadFile("profile_image" ),
+    uploadFile("profile_image"),
     StudentController.updateProfile
   )
   .delete(

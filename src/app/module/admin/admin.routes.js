@@ -2,7 +2,7 @@ const express = require("express");
 const auth = require("../../middleware/auth");
 const config = require("../../../config");
 const AdminController = require("./admin.controller");
-const { uploadFile } = require("../../middleware/fileUploader");
+const { uploadFile } = require("../../middleware/fileUploaderS3");
 
 const router = express.Router();
 

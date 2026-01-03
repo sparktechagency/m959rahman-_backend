@@ -46,7 +46,7 @@ const postAdmin = async (req) => {
     password: payload.password,
     role: EnumUserRole.ADMIN,
     phoneNumber: payload?.phoneNumber,
-    profile_image: files?.profile_image?.[0]?.path,
+    profile_image: files?.profile_image?.[0]?.location,
   };
 
   const admin = await Admin.create(adminData);
@@ -115,7 +115,7 @@ const updateAdmin = async (req) => {
   const updatedAData = {
     ...(payload.name && { name: payload.name }),
     ...(payload.phoneNumber && { phoneNumber: payload.phoneNumber }),
-    ...(files.profile_image && { profile_image: files.profile_image[0].path }),
+    ...(files.profile_image && { profile_image: files.profile_image[0].location }),
   };
 
   const [updatedAdmin] = await Promise.all([
@@ -202,7 +202,7 @@ const updateProfileImageAdmin = async (req) => {
   const updatedAdmin = await Admin.findByIdAndUpdate(
     userId,
     {
-      profile_image: files.profile_image[0].path,
+      profile_image: files.profile_image[0].location,
     },
     {
       new: true,

@@ -2,7 +2,7 @@ const { status } = require("http-status");
 const ApiError = require("../../../error/ApiError");
 const Student = require("./Student");
 const Auth = require("../auth/Auth");
-const unlinkFile = require("../../../util/unlinkFile");
+const { deleteFromS3, extractS3KeyFromUrl } = require("../../../util/s3Utils");
 const validateFields = require("../../../util/validateFields");
 const QueryBuilder = require("../../../builder/queryBuilder");
 const mongoose = require("mongoose");
@@ -21,8 +21,13 @@ const updateProfile = async (req) => {
   const existingStudent = await Student.findById(userId).lean();
 
   if (files && files.profile_image) {
-    updateData.profile_image = files.profile_image[0].path;
-    if (existingStudent.profile_image) unlinkFile(existingStudent.profile_image);
+    updateData.profile_image = files.profile_image[0].location;
+    if (existingStudent.profile_image) {
+      const s3Key = extractS3KeyFromUrl(existingStudent.profile_image);
+      if (s3Key) {
+        deleteFromS3(s3Key).catch(err => console.warn("Failed to delete old profile image:", err));
+      }
+    }
   }
 
   const [auth, student] = await Promise.all([

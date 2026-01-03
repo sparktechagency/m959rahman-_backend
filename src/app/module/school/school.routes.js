@@ -3,7 +3,7 @@ const schoolController = require("./school.controller");
 const auth = require("../../middleware/auth");
 const config = require("../../../config");
 const { EnumUserRole } = require("../../../util/enum");
-const { uploadFile } = require('../../middleware/fileUploader');
+const { uploadFile } = require('../../middleware/fileUploaderS3');
 const router = express.Router();
 
 // Teacher management routes

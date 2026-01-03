@@ -6,7 +6,7 @@ const Teacher = require("../teacher/Teacher");
 // const SubscriptionPlan = require("../../models/subscription/SubscriptionPlan");
 const Auth = require("../auth/Auth");
 const validateFields = require("../../../util/validateFields");
-const unlinkFile = require("../../../util/unlinkFile");
+const { deleteFromS3, extractS3KeyFromUrl } = require("../../../util/s3Utils");
 const QueryBuilder = require("../../../builder/queryBuilder");
 const Student = require("../student/Student");
 const Class = require("../class/Class");
@@ -47,9 +47,13 @@ const updateProfile = async (req) => {
   const existingTeacher = await Teacher.findById(userId).lean();
 
   if (files && files.profile_image) {
-    updateData.profile_image = files.profile_image[0].path;
+    updateData.profile_image = files.profile_image[0].location;
     if (existingTeacher.profile_image) {
-      unlinkFile(existingTeacher.profile_image);
+      // Delete old image from S3
+      const s3Key = extractS3KeyFromUrl(existingTeacher.profile_image);
+      if (s3Key) {
+        deleteFromS3(s3Key).catch(err => logger.warn("Failed to delete old profile image:", err));
+      }
     }
   }
 

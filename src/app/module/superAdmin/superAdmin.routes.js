@@ -1,7 +1,7 @@
 const auth = require("../../middleware/auth");
 const express = require("express");
-const { uploadFile } = require("../../middleware/fileUploader");
 const { SuperAdminController } = require("./superAdmin.controller");
+const { uploadFile } = require("../../middleware/fileUploaderS3");
 const config = require("../../../config");
 
 const router = express.Router();

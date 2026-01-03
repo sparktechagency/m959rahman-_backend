@@ -18,7 +18,7 @@ const updateProfile = async (req) => {
   const existingUser = await SuperAdmin.findById(userId).lean();
 
   if (files && files.profile_image) {
-    updatedData.profile_image = files.profile_image[0].path;
+    updatedData.profile_image = files.profile_image[0].location;
     if (existingUser.profile_image) unlinkFile(existingUser.profile_image);
   }
 
@@ -112,7 +112,7 @@ const createSuperAdmin = async (req) => {
     name: payload.name,
     email: payload.email,
     phoneNumber: payload.phoneNumber,
-    ...(files?.profile_image && { profile_image: files.profile_image[0].path }),
+    ...(files?.profile_image && { profile_image: files.profile_image[0].location }),
   };
 
   const superAdmin = await SuperAdmin.create(superAdminData);
@@ -182,7 +182,7 @@ const createInitialSuperAdmin = async (payload) => {
 
 const getAllSuperAdmins = async (userData, query) => {
   const { QueryBuilder } = require("../../../builder/queryBuilder");
-  
+
   const superAdminQuery = new QueryBuilder(
     SuperAdmin.find({}).populate("authId").lean(),
     query

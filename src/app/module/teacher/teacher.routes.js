@@ -1,6 +1,6 @@
 const express = require("express");
 const auth = require("../../middleware/auth");
-const { uploadFile } = require("../../middleware/fileUploader");
+const { uploadFile } = require("../../middleware/fileUploaderS3");
 const { TeacherController } = require("./teacher.controller");
 const config = require("../../../config");
 
@@ -14,7 +14,7 @@ router
     uploadFile([{ name: "profile_image", maxCount: 1 }]),
     TeacherController.updateProfile
   )
-  .get("/students", auth(config.auth_level.teacher), TeacherController.getAllStudentsForTeacher) 
+  .get("/students", auth(config.auth_level.teacher), TeacherController.getAllStudentsForTeacher)
   .get("/all", auth(config.auth_level.admin), TeacherController.getAllTeachers)
   .get("/:id", auth(config.auth_level.admin), TeacherController.getTeacherById)
   .patch("/:id", auth(config.auth_level.admin), TeacherController.blockUnblockTeacher)
