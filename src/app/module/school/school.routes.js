@@ -53,7 +53,12 @@ router
     .put(
         "/my-profile",
         auth(config.auth_level.school_admin),
-        uploadFile(),
+        uploadFile({
+            fields: [
+                { name: "profile_image", maxCount: 1 },
+                { name: "cover_image", maxCount: 1 },
+            ],
+        }),
         schoolController.updateSchoolProfile
     );
 

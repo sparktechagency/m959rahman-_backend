@@ -1,6 +1,6 @@
 const { default: status } = require("http-status");
 
-// const User = require("../app/module/user/User");
+const Auth = require("../app/module/auth/Auth");
 
 const emitError = require("./emitError");
 const socketCatchAsync = require("../util/socketCatchAsync");
@@ -20,7 +20,7 @@ const validateUser = socketCatchAsync(async (socket, io, payload) => {
     return null;
   }
 
-  const user = await User.findById(payload.userId);
+  const user = await Auth.findById(payload.userId);
 
   if (!user) {
     emitError(socket, status.NOT_FOUND, "User not found", "disconnect");
@@ -34,7 +34,7 @@ const updateOnlineStatus = socketCatchAsync(async (socket, io, payload) => {
   validateSocketFields(socket, payload, ["userId", "isOnline"]);
   const { userId, isOnline } = payload;
 
-  const updatedUser = await User.findByIdAndUpdate(
+  const updatedUser = await Auth.findByIdAndUpdate(
     userId,
     { isOnline },
     { new: true }
@@ -56,7 +56,7 @@ const updateLocation = socketCatchAsync(async (socket, io, payload) => {
 
   const { userId, lat, long } = payload;
 
-  const updatedUser = await User.findByIdAndUpdate(
+  const updatedUser = await Auth.findByIdAndUpdate(
     userId,
     { locationCoordinates: { coordinates: [Number(long), Number(lat)] } },
     { new: true, runValidators: true }

@@ -5,7 +5,8 @@ const auth = require("../../middleware/auth");
 const { EnumUserRole } = require("../../../util/enum");
 
 // All routes require authentication
-router.use(auth(EnumUserRole.TEACHER, EnumUserRole.SCHOOL));
+// All routes require authentication
+router.use(auth([EnumUserRole.TEACHER, EnumUserRole.SCHOOL]));
 
 /**
  * @route   POST /api/subscription/create-checkout

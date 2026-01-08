@@ -78,7 +78,7 @@ const handleGetTeacherDetails = async (req, res) => {
   try {
     const schoolId = req.params.schoolId;
     const teacherId = req.params.teacherId;
-    
+
     const teacherDetails = await schoolService.getTeacherDetails(schoolId, teacherId);
 
     res.status(200).json({
@@ -110,8 +110,8 @@ const handleUpdateTeacherStatus = async (req, res) => {
 
     const result = await schoolService.updateTeacherStatus(schoolId, teacherId, newStatus);
 
-    const message = newStatus === "active" 
-      ? "Teacher unblocked successfully" 
+    const message = newStatus === "active"
+      ? "Teacher unblocked successfully"
       : "Teacher blocked successfully";
 
     res.status(200).json({
@@ -165,7 +165,7 @@ const handleRemoveTeacherFromSchool = async (req, res) => {
 const handleGetSchoolDashboardStats = async (req, res) => {
   try {
     const schoolId = req.params.schoolId;
-    
+
     const stats = await schoolService.getSchoolDashboardStats(schoolId);
 
     res.status(200).json({
@@ -192,7 +192,7 @@ const handleUpdateSchoolProfile = async (req, res) => {
   try {
     // Check if we're using the /my-profile endpoint or the /:schoolId/profile endpoint
     let schoolId;
-    
+
     // If the schoolId is in the params, use that
     if (req.params.schoolId) {
       schoolId = req.params.schoolId;
@@ -200,7 +200,7 @@ const handleUpdateSchoolProfile = async (req, res) => {
     // Otherwise, use the userId from the JWT token (for /my-profile endpoint)
     else {
       schoolId = req.user?.userId;
-      
+
       if (!schoolId) {
         return res.status(401).json({
           success: false,
@@ -209,25 +209,27 @@ const handleUpdateSchoolProfile = async (req, res) => {
         });
       }
     }
-    
+
     // Prepare update data from the form fields
     const updateData = { ...req.body };
-    
+
     // Handle file uploads if present
     // Handle profile image upload
     if (req.files && req.files.profile_image && req.files.profile_image.length > 0) {
-      // Get the uploaded file path
-      const profileImagePath = req.files.profile_image[0].path.replace(/\\/g, '/'); // Fix for Windows path
+      // Get the uploaded file path - use location for S3, path for local
+      const file = req.files.profile_image[0];
+      const profileImagePath = file.location || file.path.replace(/\\/g, '/');
       updateData.profile_image = profileImagePath;
     }
-    
+
     // Handle cover image upload
     if (req.files && req.files.cover_image && req.files.cover_image.length > 0) {
-      // Get the uploaded file path
-      const coverImagePath = req.files.cover_image[0].path.replace(/\\/g, '/'); // Fix for Windows path
+      // Get the uploaded file path - use location for S3, path for local
+      const file = req.files.cover_image[0];
+      const coverImagePath = file.location || file.path.replace(/\\/g, '/');
       updateData.cover_image = coverImagePath;
     }
-    
+
     // Make sure we have some data to update
     if (Object.keys(updateData).length === 0) {
       return res.status(400).json({
@@ -236,9 +238,9 @@ const handleUpdateSchoolProfile = async (req, res) => {
         errorMessages: [{ path: "", message: "No data provided for update" }]
       });
     }
-    
+
     const updatedSchool = await schoolService.updateSchoolProfile(schoolId, updateData);
-    
+
     res.status(200).json({
       success: true,
       message: "School profile updated successfully",
@@ -249,14 +251,14 @@ const handleUpdateSchoolProfile = async (req, res) => {
     if (error.name === 'MulterError') {
       const handleMulterError = require('../../../error/handleMulterError');
       const multerError = handleMulterError(error);
-      
+
       return res.status(multerError.statusCode).json({
         success: false,
         message: multerError.message,
         errorMessages: multerError.errorMessages,
       });
     }
-    
+
     // Handle ApiError
     if (error instanceof ApiError) {
       return res.status(error.statusCode).json({
@@ -264,8 +266,8 @@ const handleUpdateSchoolProfile = async (req, res) => {
         message: error.message,
         errorMessages: error.errorMessages,
       });
-    } 
-    
+    }
+
     // Handle generic errors
     res.status(500).json({
       success: false,
@@ -278,9 +280,9 @@ const handleUpdateSchoolProfile = async (req, res) => {
 const handleGetSchoolProfile = async (req, res) => {
   try {
     const schoolId = req.params.schoolId;
-    
+
     const schoolProfile = await schoolService.getSchoolProfile(schoolId);
-    
+
     res.status(200).json({
       success: true,
       message: "School profile fetched successfully",
@@ -307,7 +309,7 @@ const handleGetMySchoolProfile = async (req, res) => {
   try {
     // Get the userId from the JWT token (added by auth middleware)
     const userId = req.user?.userId;
-    
+
     if (!userId) {
       return res.status(401).json({
         success: false,
@@ -315,9 +317,9 @@ const handleGetMySchoolProfile = async (req, res) => {
         errorMessages: [{ path: "", message: "Unauthorized: User ID not found in token" }]
       });
     }
-    
+
     const schoolProfile = await schoolService.getMySchoolProfile(userId);
-    
+
     res.status(200).json({
       success: true,
       message: "School profile fetched successfully",
@@ -343,9 +345,9 @@ const handleGetMySchoolProfile = async (req, res) => {
 const handleGetAllSchools = async (req, res) => {
   try {
     const { query } = req;
-    
+
     const { schools, meta } = await schoolService.getAllSchools(query);
-    
+
     res.status(200).json({
       success: true,
       message: "Schools fetched successfully",
@@ -372,9 +374,9 @@ const handleGetAllSchools = async (req, res) => {
 const handleGetSchoolDetails = async (req, res) => {
   try {
     const schoolId = req.params.schoolId;
-    
+
     const schoolDetails = await schoolService.getSchoolDetails(schoolId);
-    
+
     res.status(200).json({
       success: true,
       message: "School details fetched successfully",
@@ -401,9 +403,9 @@ const handleBlockUnblockSchool = async (req, res) => {
   try {
     const schoolId = req.params.schoolId;
     const isBlocked = req.body.isBlocked;
-    
+
     const school = await schoolService.blockUnblockSchool(schoolId, isBlocked);
-    
+
     res.status(200).json({
       success: true,
       message: "School blocked/unblocked successfully",

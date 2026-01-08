@@ -41,8 +41,8 @@ const addTeacherToSchool = async (data, schoolId, authId) => {
     email,
     teacherId: teacher._id,
     authId: teacher.authId?._id,
-    firstname: teacher.firstname,
-    lastname: teacher.lastname,
+    firstname: teacher.firstName,
+    lastname: teacher.lastName,
     authFirstName: teacher.authId?.firstName,
     authLastName: teacher.authId?.lastName
   });
@@ -134,7 +134,7 @@ const getAllTeachersInSchool = async (schoolId, query) => {
 
   // Get teacher details with all needed fields
   const teacherDetails = await Teacher.find({ _id: { $in: teacherIds } })
-    .select('_id authId firstname lastname email profile_image phoneNumber bio specialization')
+    .select('_id authId firstName lastName email profile_image phoneNumber bio specialization')
     .lean();
   //   console.log("teacherDetails", teacherDetails)
 
@@ -207,13 +207,13 @@ const getAllTeachersInSchool = async (schoolId, query) => {
     const firstName =
       authByEmail?.firstName ||
       authById?.firstName ||
-      teacher.firstname ||
+      teacher.firstName ||
       '';
 
     const lastName =
       authByEmail?.lastName ||
       authById?.lastName ||
-      teacher.lastname ||
+      teacher.lastName ||
       '';
 
     // Create full name with proper fallbacks
@@ -531,6 +531,15 @@ const updateSchoolProfile = async (schoolId, updateData) => {
     }
   });
 
+  // Handle file uploads - already processed by controller
+  if (updateData.profile_image) {
+    filteredData.profile_image = updateData.profile_image;
+  }
+
+  if (updateData.cover_image) {
+    filteredData.cover_image = updateData.cover_image;
+  }
+
   // Check if there are any valid fields to update
   if (Object.keys(filteredData).length === 0) {
     throw new ApiError(status.BAD_REQUEST, "No valid fields to update");
@@ -576,7 +585,19 @@ const getSchoolProfile = async (schoolId) => {
     cover_image: school.cover_image,
     subscription: {
       plan: school.subscription?.plan || 'basic',
-      status: school.subscription?.status || 'inactive'
+      status: school.subscription?.status || 'inactive',
+      stripeSubscriptionId: school.subscription?.stripeSubscriptionId,
+      stripeCustomerId: school.subscription?.stripeCustomerId,
+      stripePriceId: school.subscription?.stripePriceId,
+      stripeProductId: school.subscription?.stripeProductId,
+      currentPeriodStart: school.subscription?.currentPeriodStart,
+      currentPeriodEnd: school.subscription?.currentPeriodEnd,
+      cancelAtPeriodEnd: school.subscription?.cancelAtPeriodEnd,
+      canceledAt: school.subscription?.canceledAt,
+      startDate: school.subscription?.startDate,
+      endDate: school.subscription?.endDate,
+      renewalDate: school.subscription?.renewalDate,
+      autoRenew: school.subscription?.autoRenew
     }
   };
 };
@@ -611,7 +632,19 @@ const getMySchoolProfile = async (userId) => {
     cover_image: school.cover_image,
     subscription: {
       plan: school.subscription?.plan || 'basic',
-      status: school.subscription?.status || 'inactive'
+      status: school.subscription?.status || 'inactive',
+      stripeSubscriptionId: school.subscription?.stripeSubscriptionId,
+      stripeCustomerId: school.subscription?.stripeCustomerId,
+      stripePriceId: school.subscription?.stripePriceId,
+      stripeProductId: school.subscription?.stripeProductId,
+      currentPeriodStart: school.subscription?.currentPeriodStart,
+      currentPeriodEnd: school.subscription?.currentPeriodEnd,
+      cancelAtPeriodEnd: school.subscription?.cancelAtPeriodEnd,
+      canceledAt: school.subscription?.canceledAt,
+      startDate: school.subscription?.startDate,
+      endDate: school.subscription?.endDate,
+      renewalDate: school.subscription?.renewalDate,
+      autoRenew: school.subscription?.autoRenew
     }
   };
 };
@@ -808,6 +841,8 @@ const getSchoolDetails = async (schoolId) => {
     subscription: {
       plan: school.subscription?.plan || 'basic',
       status: school.subscription?.status || 'inactive'
+
+
     },
     statistics: {
       teacherCount,

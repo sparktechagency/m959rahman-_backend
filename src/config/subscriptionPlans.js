@@ -29,8 +29,8 @@ const subscriptionPlans = {
         id: "SCHOOL_YEARLY",
         name: "School Plan",
         description: "Comprehensive solution for schools with multiple teachers",
-        price: 20000, // $200.00 in cents
-        currency: "usd",
+        price: 20000, // £200.00 in pence
+        currency: "gbp",
         interval: "year",
         features: [
             "15 teachers",

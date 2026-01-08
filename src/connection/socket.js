@@ -12,6 +12,8 @@ const io = new Server(mainServer, {
   cors: socketCors,
 });
 
+global.io = io;
+
 io.on(EnumSocketEvent.CONNECTION, (socket) => {
   socketHandlers(socket, io);
 });
