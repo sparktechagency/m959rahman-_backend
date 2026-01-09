@@ -535,11 +535,7 @@ const addAssignmentToClass = async (classId, data) => {
         throw new ApiError(status.NOT_FOUND, "Class or Assignment not found");
     }
 
-    // Check if assignment is published (not draft or scheduled)
-    if (assignment.publishStatus !== "published") {
-        throw new ApiError(status.BAD_REQUEST, `Assignment is ${assignment.publishStatus}. Only published assignments can be assigned to classes.`);
-    }
-
+    // Link assignment to class regardless of status
     // Single update operation for assignment
     const updatedAssignment = await Assignment.findByIdAndUpdate(
         data.assignmentId,
@@ -561,32 +557,36 @@ const addAssignmentToClass = async (classId, data) => {
         }
     );
 
-    // Bulk create student assignments
-    const activeStudents = classData.students.filter(s => s.status === 'active');
-    const studentAssignments = activeStudents.map(student => ({
-        studentId: student.studentId,
-        assignmentId: data.assignmentId,
-        classId: classId,
-        status: "not_started"
-    }));
-
-    if (studentAssignments.length > 0) {
-        await StudentAssignment.insertMany(studentAssignments, { ordered: false });
-    }
-
-    // Send notifications to all active students about the new assignment
-    try {
+    // If assignment is PUBLISHED, distribute to students immediately
+    if (assignment.publishStatus === "published") {
+        // Bulk create student assignments
         const activeStudents = classData.students.filter(s => s.status === 'active');
-        for (const student of activeStudents) {
-            await postNotification(
-                "New Assignment Posted",
-                `A new assignment "${assignment.assignmentName}" has been posted to your class "${classData.name}". Due date: ${assignment.dueDate || 'No due date set'}.`,
-                student.studentId
-            );
+        const studentAssignments = activeStudents.map(student => ({
+            studentId: student.studentId,
+            assignmentId: data.assignmentId,
+            classId: classId,
+            status: "not_started"
+        }));
+
+        if (studentAssignments.length > 0) {
+            await StudentAssignment.insertMany(studentAssignments, { ordered: false });
         }
-    } catch (notificationError) {
-        console.error("Failed to send assignment notifications:", notificationError);
+
+        // Send notifications to all active students about the new assignment
+        try {
+            const activeStudents = classData.students.filter(s => s.status === 'active');
+            for (const student of activeStudents) {
+                await postNotification(
+                    "New Assignment Posted",
+                    `A new assignment "${assignment.assignmentName}" has been posted to your class "${classData.name}". Due date: ${assignment.dueDate || 'No due date set'}.`,
+                    student.studentId
+                );
+            }
+        } catch (notificationError) {
+            console.error("Failed to send assignment notifications:", notificationError);
+        }
     }
+    // If SCHEDULED, do nothing else. The scheduler will pick it up later.
 
     return updatedAssignment;
 };

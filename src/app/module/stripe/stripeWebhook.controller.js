@@ -4,6 +4,7 @@ const School = require("../school/School");
 const StripeCustomer = require("./StripeCustomer");
 const config = require("../../../config");
 const { logger } = require("../../../util/logger");
+const postNotification = require("../../../util/postNotification");
 
 /**
  * Handle Stripe webhook events
@@ -142,6 +143,17 @@ const handleCheckoutCompleted = async (session) => {
                 },
             }
         );
+
+        // Send notification to user
+        try {
+            await postNotification(
+                "Subscription Activated",
+                `Your ${planId.replace('_', ' ')} has been successfully activated!`,
+                user.authId
+            );
+        } catch (notifError) {
+            logger.error(`Failed to send subscription notification: ${notifError.message}`);
+        }
 
         logger.info(`🎉 Subscription activated successfully for user ${userId}!`);
     } catch (error) {
@@ -305,7 +317,16 @@ const handlePaymentFailed = async (invoice) => {
 
     logger.warn(`⚠️ Payment failed for user ${userId}`);
 
-    // TODO: Send email notification to user about failed payment
+    // Send notification to user about failed payment
+    try {
+        await postNotification(
+            "Payment Failed",
+            "Your subscription payment failed. Please update your payment method to avoid service interruption.",
+            user.authId
+        );
+    } catch (notifError) {
+        logger.error(`Failed to send payment failure notification: ${notifError.message}`);
+    }
 };
 
 const StripeWebhookController = {

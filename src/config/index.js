@@ -20,7 +20,7 @@ const config = {
   base_url: process.env.BASE_URL,
   database_url: process.env.MONGO_URL,
   auth_level: {
-    user: ["STUDENT", "TEACHER", "ADMIN", "SUPER_ADMIN"], // All authenticated users
+    user: ["STUDENT", "TEACHER", "SCHOOL", "ADMIN", "SUPER_ADMIN"], // All authenticated users
     teacher: ["TEACHER", "ADMIN", "SUPER_ADMIN"], // Teacher and above
     school_admin: ["SCHOOL", "ADMIN", "SUPER_ADMIN"],
     admin: ["ADMIN", "SUPER_ADMIN"], // Admin and super admin
