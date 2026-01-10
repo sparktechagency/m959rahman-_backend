@@ -1,6 +1,6 @@
 const express = require("express");
 const auth = require("../../middleware/auth");
-const { uploadFile } = require("../../middleware/fileUploader");
+const { uploadFile } = require("../../middleware/fileUploaderS3");
 const { CurriculumController } = require("./curriculum.controller");
 const { AnswerValidationController } = require("./answerValidation.controller");
 const config = require("../../../config");

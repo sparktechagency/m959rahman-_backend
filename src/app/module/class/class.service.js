@@ -232,6 +232,21 @@ const addStudentToClass = async (classId, data) => {
             throw new ApiError(status.NOT_FOUND, "Student not found");
         }
 
+        // Check if student is part of any other active class
+        const studentAlreadyInClass = await Class.findOne({
+            "students": {
+                $elemMatch: {
+                    studentId: student._id,
+                    status: "active"
+                }
+            },
+            isActive: true
+        });
+
+        if (studentAlreadyInClass && studentAlreadyInClass._id.toString() !== classId) {
+            throw new ApiError(status.BAD_REQUEST, `Student is already enrolled in class "${studentAlreadyInClass.name}"`);
+        }
+
         // Check if student is already in class (including inactive students)
         const existingStudent = classData.students.find(
             s => s.studentId.toString() === student._id.toString()

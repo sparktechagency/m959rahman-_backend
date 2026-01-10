@@ -37,9 +37,7 @@ const QuestionSchema = new Schema(
       required: true,
       trim: true,
     },
-    attachments: {
-      type: String,
-    },
+    attachments: [String],
     partialMarks: [PartialAnswerSchema],
     fullMarks: FullAnswerSchema,
     isActive: {

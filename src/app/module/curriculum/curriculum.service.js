@@ -9,7 +9,7 @@ const QueryBuilder = require("../../../builder/queryBuilder");
 const unlinkFile = require("../../../util/unlinkFile");
 const postNotification = require("../../../util/postNotification");
 const Teacher = require("../../module/teacher/Teacher");
-// const School = require("../../module/school/School");
+const School = require("../../module/school/School");
 
 const createCurriculum = async (req) => {
   const { body: data, user } = req;
@@ -80,10 +80,10 @@ const getAllCurriculums = async (query) => {
 
   // Get topic counts using Promise.all for better performance
   if (curriculums.length > 0) {
-    const topicCountPromises = curriculums.map(curriculum => 
-      Topic.countDocuments({ 
-        curriculumId: curriculum._id, 
-        isActive: true 
+    const topicCountPromises = curriculums.map(curriculum =>
+      Topic.countDocuments({
+        curriculumId: curriculum._id,
+        isActive: true
       })
     );
 
@@ -293,7 +293,7 @@ const getTopic = async (id) => {
 
 // const getAllTopics = async (query) => {
 //   console.log("Query parameters received:", query);
-  
+
 //   const topicQuery = new QueryBuilder(
 //     Topic.find({ isActive: true })
 //       .populate("curriculumId", "name description")
@@ -308,7 +308,7 @@ const getTopic = async (id) => {
 //     .fields();
 
 //   console.log("Final query:", topicQuery.modelQuery.getQuery());
-  
+
 //   const [topics, meta] = await Promise.all([
 //     topicQuery.modelQuery,
 //     topicQuery.countTotal(),
@@ -323,16 +323,16 @@ const getTopic = async (id) => {
 const getAllTopics = async (query) => {
   console.log('=== DEBUG getAllTopics ===');
   console.log('Query params:', query);
-  
+
   try {
     // Test if QueryBuilder is the issue
     const testQuery = new QueryBuilder(
       Topic.find({ isActive: true }),
       query
     );
-    
+
     console.log('QueryBuilder test passed');
-    
+
     const topicQuery = new QueryBuilder(
       Topic.find({ isActive: true })
         .populate("curriculumId", "name description")
@@ -352,7 +352,7 @@ const getAllTopics = async (query) => {
     ]);
 
     console.log('Query executed successfully');
-    
+
     return {
       meta,
       topics,
@@ -440,8 +440,8 @@ const createQuestion = async (req) => {
   };
 
   // Handle image upload
-  if (files && files.questionImage) {
-    questionData.questionImage = files.questionImage[0].path;
+  if (files && files.attachments) {
+    questionData.attachments = files.attachments.map(file => file.location || file.path);
   }
 
   // Parse partial marks from form-data

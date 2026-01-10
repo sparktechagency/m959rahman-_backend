@@ -547,6 +547,21 @@ const joinClassByCode = async (userData, data) => {
     throw new ApiError(status.NOT_FOUND, "Student not found");
   }
 
+  // Check if student is already enrolled in any active class
+  const existingClass = await Class.findOne({
+    "students": {
+      $elemMatch: {
+        studentId: userId,
+        status: "active"
+      }
+    },
+    isActive: true
+  });
+
+  if (existingClass && existingClass.classCode !== data.classCode.toUpperCase()) {
+    throw new ApiError(status.BAD_REQUEST, `You are already enrolled in class "${existingClass.name}". You cannot join multiple classes.`);
+  }
+
   // Find class by code (must be active)
   const classData = await Class.findOne({
     classCode: data.classCode.toUpperCase(), // Normalize to uppercase

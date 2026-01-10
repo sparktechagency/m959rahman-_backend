@@ -12,25 +12,25 @@ const validateFields = require("../../../util/validateFields");
 const calculateStringSimilarity = (str1, str2) => {
   str1 = str1.toLowerCase().trim();
   str2 = str2.toLowerCase().trim();
-  
+
   if (str1 === str2) return 1.0;
-  
+
   const matrix = [];
   const len1 = str1.length;
   const len2 = str2.length;
-  
+
   if (len1 === 0) return 0;
   if (len2 === 0) return 0;
-  
+
   // Initialize matrix
   for (let i = 0; i <= len2; i++) {
     matrix[i] = [i];
   }
-  
+
   for (let j = 0; j <= len1; j++) {
     matrix[0][j] = j;
   }
-  
+
   // Calculate Levenshtein distance
   for (let i = 1; i <= len2; i++) {
     for (let j = 1; j <= len1; j++) {
@@ -45,7 +45,7 @@ const calculateStringSimilarity = (str1, str2) => {
       }
     }
   }
-  
+
   const distance = matrix[len2][len1];
   const maxLength = Math.max(len1, len2);
   return (maxLength - distance) / maxLength;
@@ -58,12 +58,12 @@ const checkPartialMarks = (studentAnswer, partialMarks) => {
   if (!partialMarks || !Array.isArray(partialMarks) || partialMarks.length === 0) {
     return { matched: false, marks: 0, similarity: 0 };
   }
-  
+
   let bestMatch = { matched: false, marks: 0, similarity: 0 };
-  
+
   for (const partialOption of partialMarks) {
     const similarity = calculateStringSimilarity(studentAnswer, partialOption.answer);
-    
+
     // Consider it a match if similarity is 80% or higher
     if (similarity >= 0.8) {
       if (partialOption.marks > bestMatch.marks) {
@@ -76,7 +76,7 @@ const checkPartialMarks = (studentAnswer, partialMarks) => {
       }
     }
   }
-  
+
   return bestMatch;
 };
 
@@ -87,9 +87,9 @@ const checkFullMarks = (studentAnswer, fullMarks) => {
   if (!fullMarks || !fullMarks.answer) {
     return { matched: false, marks: 0, similarity: 0 };
   }
-  
+
   const similarity = calculateStringSimilarity(studentAnswer, fullMarks.answer);
-  
+
   // For full marks, require 95% or higher similarity
   return {
     matched: similarity >= 0.95,
@@ -106,12 +106,12 @@ const validateSingleAnswer = async (questionId, studentAnswer) => {
   if (!mongoose.Types.ObjectId.isValid(questionId)) {
     throw new ApiError(status.BAD_REQUEST, "Invalid question ID");
   }
-  
+
   const question = await Question.findById(questionId);
   if (!question || !question.isActive) {
     throw new ApiError(status.NOT_FOUND, "Question not found");
   }
-  
+
   const validationResult = {
     questionId,
     studentAnswer,
@@ -122,7 +122,7 @@ const validateSingleAnswer = async (questionId, studentAnswer) => {
     similarity: 0,
     feedback: ""
   };
-  
+
   // First check for full marks
   const fullMarksResult = checkFullMarks(studentAnswer, question.fullMarks);
   if (fullMarksResult.matched) {
@@ -132,7 +132,7 @@ const validateSingleAnswer = async (questionId, studentAnswer) => {
     validationResult.feedback = `Excellent! Your answer matches ${Math.round(fullMarksResult.similarity * 100)}% with the correct answer.`;
     return validationResult;
   }
-  
+
   // Then check for partial marks
   const partialMarksResult = checkPartialMarks(studentAnswer, question.partialMarks);
   if (partialMarksResult.matched) {
@@ -142,7 +142,7 @@ const validateSingleAnswer = async (questionId, studentAnswer) => {
     validationResult.feedback = `Good attempt! Your answer matches ${Math.round(partialMarksResult.similarity * 100)}% with "${partialMarksResult.matchedAnswer}". You earned partial marks.`;
     return validationResult;
   }
-  
+
   // No match found
   validationResult.feedback = "Your answer does not match any of the expected answers. Please review the question and try again.";
   return validationResult;
@@ -154,7 +154,7 @@ const validateSingleAnswer = async (questionId, studentAnswer) => {
 const validateAssignmentAnswers = async (studentId, assignmentId, answers) => {
   const validationResults = [];
   let totalMarksObtained = 0;
-  
+
   for (const answerData of answers) {
     try {
       const result = await validateSingleAnswer(answerData.questionId, answerData.answer);
@@ -169,7 +169,7 @@ const validateAssignmentAnswers = async (studentId, assignmentId, answers) => {
       });
     }
   }
-  
+
   return {
     studentId,
     assignmentId,
@@ -186,35 +186,35 @@ const validateAssignmentAnswers = async (studentId, assignmentId, answers) => {
 const submitAndValidateAnswers = async (req) => {
   const { body: data, user } = req;
   const { assignmentId, answers } = data;
-  
+
   validateFields(data, ["assignmentId", "answers"]);
-  
+
   if (!Array.isArray(answers) || answers.length === 0) {
     throw new ApiError(status.BAD_REQUEST, "Answers array is required and cannot be empty");
   }
-  
+
   // Validate each answer has required fields
   for (const answer of answers) {
     validateFields(answer, ["questionId", "answer"]);
   }
-  
+
   // Get or create student assignment
   let studentAssignment = await StudentAssignment.findOne({
     studentId: user.userId,
     assignmentId
   });
-  
+
   // console.log(studentAssignment.assignmentId);
   // console.log(assignmentId);
 
-  
+
   if (!studentAssignment) {
     throw new ApiError(status.NOT_FOUND, "Student assignment not found");
   }
-  
+
   // Validate all answers
   const validationResult = await validateAssignmentAnswers(user.userId, assignmentId, answers);
-  
+
   // Update student assignment with validated answers
   const updatedAnswers = answers.map((answer, index) => {
     const validation = validationResult.validationResults[index];
@@ -225,10 +225,10 @@ const submitAndValidateAnswers = async (req) => {
       submittedAt: new Date()
     };
   });
-  
+
   // Calculate completion rate
   const completionRate = (answers.length / validationResult.totalQuestions) * 100;
-  
+
   // Update the assignment
   studentAssignment.answers = updatedAnswers;
   studentAssignment.totalMarksObtained = validationResult.totalMarksObtained;
@@ -236,13 +236,23 @@ const submitAndValidateAnswers = async (req) => {
   studentAssignment.status = "graded";
   studentAssignment.submittedAt = new Date();
   studentAssignment.gradedAt = new Date();
-  
+
   await studentAssignment.save();
-  
+
+  // Sanitize validation results to hide correct answers
+  const sanitizedValidationResults = validationResult.validationResults.map(result => ({
+    questionId: result.questionId,
+    studentAnswer: result.studentAnswer,
+    marksObtained: result.marksObtained,
+    validationType: result.validationType,
+    similarity: result.similarity,
+    feedback: result.feedback
+  }));
+
   return {
     assignmentId,
     studentId: user.userId,
-    validationResults: validationResult.validationResults,
+    validationResults: sanitizedValidationResults,
     totalMarksObtained: validationResult.totalMarksObtained,
     completionRate: Math.round(completionRate),
     submittedAt: studentAssignment.submittedAt,
@@ -255,12 +265,12 @@ const submitAndValidateAnswers = async (req) => {
  */
 const getAnswerValidationDetails = async (questionId, studentAnswer) => {
   const result = await validateSingleAnswer(questionId, studentAnswer);
-  
+
   // Get question details for context
   const question = await Question.findById(questionId)
     .populate("topicId", "name")
     .lean();
-  
+
   return {
     question: {
       id: question._id,
